@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { SpeedInsights } from '@vercel/speed-insights/react';
 import { WindowInstance, AppId, StickyNote, FileItem } from './types';
 import { CrtEffects } from './components/CrtEffects';
 import { Taskbar } from './components/Taskbar';
@@ -554,6 +555,9 @@ export default function App() {
           }}
         />
       )}
+
+      {/* 8. Vercel Speed Insights */}
+      <SpeedInsights />
     </div>
   );
 }
