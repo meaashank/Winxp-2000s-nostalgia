@@ -60,10 +60,15 @@ export const StickyNotes: React.FC<StickyNotesProps> = ({
   const dragRef = useRef<{ id: string; startX: number; startY: number; initX: number; initY: number } | null>(null);
 
   const handlePointerDown = (id: string, e: React.PointerEvent) => {
-    // Only drag when interacting with the top strip or border
-    if ((e.target as HTMLElement).tagName === 'TEXTAREA' || (e.target as HTMLElement).tagName === 'BUTTON') {
+    // Only skip drag if directly clicking buttons or typing in active textarea
+    const target = e.target as HTMLElement;
+    if (target.tagName === 'BUTTON' || target.closest('button')) {
       return;
     }
+    if (target.tagName === 'TEXTAREA') {
+      return;
+    }
+
     onBringToFront(id);
     playMouseClick();
 
@@ -82,10 +87,13 @@ export const StickyNotes: React.FC<StickyNotesProps> = ({
       if (!dragRef.current) return;
       const dx = moveEvent.clientX - dragRef.current.startX;
       const dy = moveEvent.clientY - dragRef.current.startY;
+      const newX = Math.max(0, Math.min(window.innerWidth - 220, dragRef.current.initX + dx));
+      const newY = Math.max(0, Math.min(window.innerHeight - 180, dragRef.current.initY + dy));
+      
       onUpdateNote(dragRef.current.id, {
         position: {
-          x: Math.max(10, Math.min(window.innerWidth - 180, dragRef.current.initX + dx)),
-          y: Math.max(10, Math.min(window.innerHeight - 150, dragRef.current.initY + dy)),
+          x: newX,
+          y: newY,
         },
       });
     };

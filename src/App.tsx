@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { SpeedInsights } from '@vercel/speed-insights/react';
 import { WindowInstance, AppId, StickyNote, FileItem } from './types';
 import { CrtEffects } from './components/CrtEffects';
 import { Taskbar } from './components/Taskbar';
@@ -19,12 +18,14 @@ import { MinesweeperApp } from './components/apps/MinesweeperApp';
 import { CounterStrikeTrainer } from './components/apps/CounterStrikeTrainer';
 import { NotepadApp } from './components/apps/NotepadApp';
 import { PaintApp } from './components/apps/PaintApp';
+import { StickyNoteApp } from './components/apps/StickyNoteApp';
+import { PlaylistProvider } from './components/PlaylistProvider';
+import { MusicPlayerDock } from './components/MusicPlayerDock';
 
 import {
   playMouseClick,
   playCrtDegauss,
   playAimBuzz,
-  toggleAmbience,
   playWindowsBalloon,
   playHddSeek,
 } from './utils/audio';
@@ -139,6 +140,18 @@ const INITIAL_WINDOWS: WindowInstance[] = [
     position: { x: 240, y: 120 },
     size: { width: 480, height: 340 },
   },
+  {
+    id: 'sticky_app_main',
+    appId: 'sticky_note_app',
+    title: 'Sticky Notes Studio 2004 (Cabin 04)',
+    icon: '📝',
+    isOpen: false,
+    isMinimized: false,
+    isMaximized: false,
+    zIndex: 4,
+    position: { x: 240, y: 70 },
+    size: { width: 720, height: 480 },
+  },
 ];
 
 // Authentic Classical Windows Sticky Notes on Desktop
@@ -147,7 +160,7 @@ const INITIAL_STICKY_NOTES: StickyNote[] = [
     id: 'sticky_1',
     text: `CABIN 04 — Midnight Session\nTime: 10:15 PM - 12:15 AM\nRate: $2.00/hr (Prepaid $4.00)\n\n* Don't forget floppy disk\n* CS 1.6 tournament at 11:30!`,
     color: 'yellow',
-    position: { x: 1100, y: 40 },
+    position: { x: 1060, y: 40 },
     rotation: -1.5,
     isPinnedToDesktop: true,
     authorNote: 'LAN Desk Pass',
@@ -157,7 +170,7 @@ const INITIAL_STICKY_NOTES: StickyNote[] = [
     id: 'sticky_2',
     text: `GTA VICE CITY CHEATS:\n- ASPIRINE (Health)\n- PRECIOUSPROTECTION\n- NUTTERTOOLS (Heavy Guns)\n- PANZER (Tank)\n- SEAWAYS (Cars on water)`,
     color: 'pink',
-    position: { x: 1120, y: 250 },
+    position: { x: 1080, y: 250 },
     rotation: 2.2,
     isPinnedToDesktop: true,
     authorNote: 'Cheat Sheet',
@@ -167,7 +180,7 @@ const INITIAL_STICKY_NOTES: StickyNote[] = [
     id: 'sticky_3',
     text: `AIM Screen Names:\nxXSarahXx (bestie)\nHaloMaster (LAN partner)\nsk8rboi2004 (Tony Hawk)`,
     color: 'cyan',
-    position: { x: 1110, y: 460 },
+    position: { x: 1070, y: 460 },
     rotation: -2.0,
     isPinnedToDesktop: true,
     authorNote: 'AIM Contacts',
@@ -180,19 +193,47 @@ export default function App() {
   const [isDegaussing, setIsDegaussing] = useState(false);
   const [isBuzzing, setIsBuzzing] = useState(false);
   const [isShuttingDownModal, setIsShuttingDownModal] = useState(false);
-  const [isAmbienceActive, setIsAmbienceActive] = useState(false);
 
   const [windows, setWindows] = useState<WindowInstance[]>(INITIAL_WINDOWS);
   const [activeWindowId, setActiveWindowId] = useState<string | null>('aim_main');
-  const [stickyNotes, setStickyNotes] = useState<StickyNote[]>(INITIAL_STICKY_NOTES);
+  
+  // Load persisted sticky notes from sessionStorage if available
+  const [stickyNotes, setStickyNotes] = useState<StickyNote[]>(() => {
+    try {
+      const saved = sessionStorage.getItem('cyber_cafe_sticky_notes');
+      if (saved) {
+        return JSON.parse(saved);
+      }
+    } catch {
+      // ignore
+    }
+    return INITIAL_STICKY_NOTES;
+  });
+
   const [selectedIconId, setSelectedIconId] = useState<string | null>(null);
   const [maxZIndex, setMaxZIndex] = useState(25);
+
+  // Sync sticky notes with sessionStorage
+  useEffect(() => {
+    try {
+      sessionStorage.setItem('cyber_cafe_sticky_notes', JSON.stringify(stickyNotes));
+    } catch {
+      // ignore
+    }
+  }, [stickyNotes]);
 
   // Easter egg keyboard sequence buffer
   const [keyBuffer, setKeyBuffer] = useState('');
 
-  // Handle global shortcuts
+  // Handle global shortcuts and disable context menu (anti-right click)
   useEffect(() => {
+    const handleContextMenu = (e: MouseEvent) => {
+      e.preventDefault();
+    };
+
+    window.addEventListener('contextmenu', handleContextMenu, { capture: true });
+    document.addEventListener('contextmenu', handleContextMenu, { capture: true });
+
     const handleKeyDown = (e: KeyboardEvent) => {
       // D key -> Degauss
       if (e.key === 'd' || e.key === 'D') {
@@ -204,12 +245,6 @@ export default function App() {
       if (e.key === 'b' || e.key === 'B') {
         if ((e.target as HTMLElement).tagName !== 'INPUT' && (e.target as HTMLElement).tagName !== 'TEXTAREA') {
           triggerBuzz();
-        }
-      }
-      // M key -> Ambience toggle
-      if (e.key === 'm' || e.key === 'M') {
-        if ((e.target as HTMLElement).tagName !== 'INPUT' && (e.target as HTMLElement).tagName !== 'TEXTAREA') {
-          handleToggleAmbience();
         }
       }
 
@@ -226,7 +261,11 @@ export default function App() {
     };
 
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('contextmenu', handleContextMenu, { capture: true });
+      document.removeEventListener('contextmenu', handleContextMenu, { capture: true });
+      window.removeEventListener('keydown', handleKeyDown);
+    };
   }, []);
 
   const triggerDegauss = () => {
@@ -239,11 +278,6 @@ export default function App() {
     playAimBuzz();
     setIsBuzzing(true);
     setTimeout(() => setIsBuzzing(false), 700);
-  };
-
-  const handleToggleAmbience = () => {
-    const newState = toggleAmbience();
-    setIsAmbienceActive(newState);
   };
 
   const focusWindow = (id: string) => {
@@ -352,212 +386,231 @@ export default function App() {
   }
 
   return (
-    <div
-      id="midnight-cyber-cafe-terminal"
-      className={`fixed inset-0 w-screen h-screen overflow-hidden select-none bg-[#0a1e3f] ${
-        isDegaussing ? 'animate-degauss' : ''
-      } ${isBuzzing ? 'animate-aim-buzz' : ''}`}
-      onClick={(e) => {
-        // Deselect icons when clicking empty desktop
-        if ((e.target as HTMLElement).id === 'desktop-surface') {
-          setSelectedIconId(null);
-        }
-      }}
-    >
-      {/* 1. Subtle Edge-to-Edge CRT Shaders (Curved Glass, Scanlines, Phosphor subtle glow) */}
-      <CrtEffects isDegaussing={isDegaussing} scanlinesEnabled={true} />
-
-      {/* 2. Classic 2004 Serene Landscape Desktop Wallpaper (Edge-to-Edge Fullscreen) */}
+    <PlaylistProvider>
       <div
-        id="desktop-surface"
-        className="absolute inset-0 w-full h-full pb-[30px]"
-        style={{
-          backgroundImage: `
-            linear-gradient(180deg, rgba(20, 60, 130, 0.4) 0%, rgba(30, 90, 180, 0.2) 40%, rgba(34, 110, 60, 0.3) 70%, rgba(15, 60, 30, 0.6) 100%),
-            radial-gradient(ellipse at 50% 30%, #5b92e5 0%, #295aa6 45%, #102a5c 100%)
-          `,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
+        id="midnight-cyber-cafe-terminal"
+        onContextMenu={(e) => e.preventDefault()}
+        className={`fixed inset-0 w-screen h-screen overflow-hidden select-none bg-[#0a1e3f] ${
+          isDegaussing ? 'animate-degauss' : ''
+        } ${isBuzzing ? 'animate-aim-buzz' : ''}`}
+        onClick={(e) => {
+          // Deselect icons when clicking empty desktop
+          if ((e.target as HTMLElement).id === 'desktop-surface') {
+            setSelectedIconId(null);
+          }
         }}
       >
-        {/* Environmental Subtle Stamp */}
-        <div className="absolute top-3 right-4 pointer-events-none text-right opacity-30 select-none font-mono text-[10px] text-white">
-          <div>CABIN 04 · LAN 100Mbps</div>
-          <div>MIDNIGHT CYBER CAFÉ</div>
-        </div>
+        {/* 1. Subtle Edge-to-Edge CRT Shaders (Curved Glass, Scanlines, Phosphor subtle glow) */}
+        <CrtEffects isDegaussing={isDegaussing} scanlinesEnabled={true} />
 
-        {/* 3. Classical Windows Desktop Sticky Notes (Pinned directly to screen!) */}
-        <StickyNotes
-          notes={stickyNotes}
-          onUpdateNote={updateStickyNote}
-          onDeleteNote={deleteStickyNote}
-          onAddNote={addStickyNote}
-          onBringToFront={bringStickyToFront}
-        />
-
-        {/* 4. Desktop Icons Column (Left side of screen) */}
-        <div className="absolute top-4 left-4 flex flex-col gap-3 z-10">
-          <DesktopIcon
-            id="my_computer"
-            title="My Computer"
-            icon="💻"
-            isSelected={selectedIconId === 'my_computer'}
-            onClick={() => setSelectedIconId('my_computer')}
-            onDoubleClick={() => openApp('my_computer')}
-          />
-
-          <DesktopIcon
-            id="my_docs"
-            title="My Documents"
-            icon="📁"
-            isSelected={selectedIconId === 'my_docs'}
-            onClick={() => setSelectedIconId('my_docs')}
-            onDoubleClick={() => openApp('my_computer')}
-          />
-
-          <DesktopIcon
-            id="ie"
-            title="Internet Explorer"
-            icon="🌐"
-            isSelected={selectedIconId === 'ie'}
-            onClick={() => setSelectedIconId('ie')}
-            onDoubleClick={() => openApp('internet_explorer')}
-          />
-
-          <DesktopIcon
-            id="aim"
-            title="AIM"
-            icon="🏃"
-            isSelected={selectedIconId === 'aim'}
-            onClick={() => setSelectedIconId('aim')}
-            onDoubleClick={() => openApp('aim')}
-          />
-
-          <DesktopIcon
-            id="limewire"
-            title="LimeWire"
-            icon="🍋"
-            isSelected={selectedIconId === 'limewire'}
-            onClick={() => setSelectedIconId('limewire')}
-            onDoubleClick={() => openApp('limewire')}
-          />
-
-          <DesktopIcon
-            id="winamp"
-            title="Winamp"
-            icon="⚡"
-            isSelected={selectedIconId === 'winamp'}
-            onClick={() => setSelectedIconId('winamp')}
-            onDoubleClick={() => openApp('winamp')}
-          />
-
-          <DesktopIcon
-            id="cs"
-            title="Counter-Strike 1.6"
-            icon="🎯"
-            isSelected={selectedIconId === 'cs'}
-            onClick={() => setSelectedIconId('cs')}
-            onDoubleClick={() => openApp('cs_trainer')}
-          />
-
-          <DesktopIcon
-            id="minesweeper"
-            title="Minesweeper"
-            icon="💣"
-            isSelected={selectedIconId === 'minesweeper'}
-            onClick={() => setSelectedIconId('minesweeper')}
-            onDoubleClick={() => openApp('minesweeper')}
-          />
-
-          <DesktopIcon
-            id="cheats"
-            title="GTA Cheats.txt"
-            icon="📄"
-            isSelected={selectedIconId === 'cheats'}
-            onClick={() => setSelectedIconId('cheats')}
-            onDoubleClick={() => openApp('notepad')}
-          />
-
-          <DesktopIcon
-            id="recycle"
-            title="Recycle Bin"
-            icon="🗑️"
-            isSelected={selectedIconId === 'recycle'}
-            onClick={() => setSelectedIconId('recycle')}
-            onDoubleClick={() => playMouseClick()}
-          />
-        </div>
-
-        {/* 5. Window Manager Rendering */}
-        {windows.map((win) => (
-          <WindowFrame
-            key={win.id}
-            instance={win}
-            isActive={activeWindowId === win.id}
-            onFocus={() => focusWindow(win.id)}
-            onClose={() => closeWindow(win.id)}
-            onMinimize={() => toggleMinimizeWindow(win.id)}
-            onMaximize={() => maximizeWindow(win.id)}
-            onUpdatePosition={(x, y) => updateWindowPosition(win.id, x, y)}
-          >
-            {win.appId === 'aim' && <AimApp onTriggerBuzz={triggerBuzz} />}
-            {win.appId === 'winamp' && <WinampApp />}
-            {win.appId === 'internet_explorer' && <InternetExplorerApp />}
-            {win.appId === 'limewire' && <LimeWireApp />}
-            {win.appId === 'my_computer' && (
-              <MyComputerApp
-                onOpenFile={(file: FileItem) => {
-                  if (file.type === 'txt' || file.type === 'doc') {
-                    openApp('notepad', { initialContent: file.content });
-                  } else if (file.type === 'mp3') {
-                    openApp('winamp');
-                  } else if (file.type === 'exe') {
-                    if (file.id.includes('cs')) openApp('cs_trainer');
-                    else openApp('minesweeper');
-                  } else if (file.type === 'html') {
-                    openApp('internet_explorer');
-                  }
-                }}
-              />
-            )}
-            {win.appId === 'minesweeper' && <MinesweeperApp />}
-            {win.appId === 'cs_trainer' && <CounterStrikeTrainer />}
-            {win.appId === 'notepad' && (
-              <NotepadApp initialContent={win.extraData?.initialContent} />
-            )}
-            {win.appId === 'paint' && <PaintApp />}
-          </WindowFrame>
-        ))}
-      </div>
-
-      {/* 6. Authentic Windows XP Taskbar */}
-      <Taskbar
-        windows={windows}
-        activeWindowId={activeWindowId}
-        onFocusWindow={focusWindow}
-        onToggleMinimize={toggleMinimizeWindow}
-        onOpenApp={openApp}
-        onShowDesktop={showDesktop}
-        onTriggerDegauss={triggerDegauss}
-        onToggleStickyNote={addStickyNote}
-        onShutDownRequest={() => setIsShuttingDownModal(true)}
-        isAmbienceActive={isAmbienceActive}
-        onToggleAmbience={handleToggleAmbience}
-      />
-
-      {/* 7. Authentic Shut Down Dialog Overlay */}
-      {isShuttingDownModal && (
-        <ShutdownScreen
-          onCancel={() => setIsShuttingDownModal(false)}
-          onRestart={() => {
-            setIsShuttingDownModal(false);
-            setIsBooted(false);
+        {/* 2. Classic 2004 Serene Landscape Desktop Wallpaper (Edge-to-Edge Fullscreen) */}
+        <div
+          id="desktop-surface"
+          className="absolute inset-0 w-full h-full pb-[30px]"
+          style={{
+            backgroundImage: `
+              linear-gradient(180deg, rgba(20, 60, 130, 0.4) 0%, rgba(30, 90, 180, 0.2) 40%, rgba(34, 110, 60, 0.3) 70%, rgba(15, 60, 30, 0.6) 100%),
+              radial-gradient(ellipse at 50% 30%, #5b92e5 0%, #295aa6 45%, #102a5c 100%)
+            `,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
           }}
-        />
-      )}
+        >
+          {/* Environmental Subtle Stamp */}
+          <div className="absolute top-3 right-4 pointer-events-none text-right opacity-30 select-none font-mono text-[10px] text-white">
+            <div>CABIN 04 · LAN 100Mbps</div>
+            <div>MIDNIGHT CYBER CAFÉ</div>
+          </div>
 
-      {/* 8. Vercel Speed Insights */}
-      <SpeedInsights />
-    </div>
+          {/* 3. Classical Windows Desktop Sticky Notes (Pinned directly to screen!) */}
+          <StickyNotes
+            notes={stickyNotes}
+            onUpdateNote={updateStickyNote}
+            onDeleteNote={deleteStickyNote}
+            onAddNote={addStickyNote}
+            onBringToFront={bringStickyToFront}
+          />
+
+          {/* 4. Desktop Icons Column (Left side of screen) */}
+          <div className="absolute top-4 left-4 flex flex-col gap-3 z-10">
+            <DesktopIcon
+              id="my_computer"
+              title="My Computer"
+              icon="💻"
+              isSelected={selectedIconId === 'my_computer'}
+              onClick={() => setSelectedIconId('my_computer')}
+              onDoubleClick={() => openApp('my_computer')}
+            />
+
+            <DesktopIcon
+              id="my_docs"
+              title="My Documents"
+              icon="📁"
+              isSelected={selectedIconId === 'my_docs'}
+              onClick={() => setSelectedIconId('my_docs')}
+              onDoubleClick={() => openApp('my_computer')}
+            />
+
+            <DesktopIcon
+              id="ie"
+              title="Internet Explorer"
+              icon="🌐"
+              isSelected={selectedIconId === 'ie'}
+              onClick={() => setSelectedIconId('ie')}
+              onDoubleClick={() => openApp('internet_explorer')}
+            />
+
+            <DesktopIcon
+              id="aim"
+              title="AIM"
+              icon="🏃"
+              isSelected={selectedIconId === 'aim'}
+              onClick={() => setSelectedIconId('aim')}
+              onDoubleClick={() => openApp('aim')}
+            />
+
+            <DesktopIcon
+              id="limewire"
+              title="LimeWire"
+              icon="🍋"
+              isSelected={selectedIconId === 'limewire'}
+              onClick={() => setSelectedIconId('limewire')}
+              onDoubleClick={() => openApp('limewire')}
+            />
+
+            <DesktopIcon
+              id="winamp"
+              title="Winamp"
+              icon="⚡"
+              isSelected={selectedIconId === 'winamp'}
+              onClick={() => setSelectedIconId('winamp')}
+              onDoubleClick={() => openApp('winamp')}
+            />
+
+            <DesktopIcon
+              id="cs"
+              title="Counter-Strike 1.6"
+              icon="🎯"
+              isSelected={selectedIconId === 'cs'}
+              onClick={() => setSelectedIconId('cs')}
+              onDoubleClick={() => openApp('cs_trainer')}
+            />
+
+            <DesktopIcon
+              id="minesweeper"
+              title="Minesweeper"
+              icon="💣"
+              isSelected={selectedIconId === 'minesweeper'}
+              onClick={() => setSelectedIconId('minesweeper')}
+              onDoubleClick={() => openApp('minesweeper')}
+            />
+
+            <DesktopIcon
+              id="cheats"
+              title="GTA Cheats.txt"
+              icon="📄"
+              isSelected={selectedIconId === 'cheats'}
+              onClick={() => setSelectedIconId('cheats')}
+              onDoubleClick={() => openApp('notepad')}
+            />
+
+            <DesktopIcon
+              id="recycle"
+              title="Recycle Bin"
+              icon="🗑️"
+              isSelected={selectedIconId === 'recycle'}
+              onClick={() => setSelectedIconId('recycle')}
+              onDoubleClick={() => playMouseClick()}
+            />
+          </div>
+
+          {/* 5. Window Manager Rendering */}
+          {windows.map((win) => (
+            <WindowFrame
+              key={win.id}
+              instance={win}
+              isActive={activeWindowId === win.id}
+              onFocus={() => focusWindow(win.id)}
+              onClose={() => closeWindow(win.id)}
+              onMinimize={() => toggleMinimizeWindow(win.id)}
+              onMaximize={() => maximizeWindow(win.id)}
+              onUpdatePosition={(x, y) => updateWindowPosition(win.id, x, y)}
+            >
+              {win.appId === 'aim' && <AimApp onTriggerBuzz={triggerBuzz} />}
+              {win.appId === 'winamp' && <WinampApp />}
+              {win.appId === 'internet_explorer' && <InternetExplorerApp />}
+              {win.appId === 'limewire' && <LimeWireApp />}
+              {win.appId === 'my_computer' && (
+                <MyComputerApp
+                  onOpenFile={(file: FileItem) => {
+                    if (file.id === 'sticky_editor_app') {
+                      openApp('sticky_note_app');
+                    } else if (file.type === 'txt' || file.type === 'doc') {
+                      openApp('notepad', { initialContent: file.content });
+                    } else if (file.type === 'mp3') {
+                      openApp('winamp');
+                    } else if (file.type === 'exe') {
+                      if (file.id.includes('cs')) openApp('cs_trainer');
+                      else openApp('minesweeper');
+                    } else if (file.type === 'html') {
+                      openApp('internet_explorer');
+                    }
+                  }}
+                />
+              )}
+              {win.appId === 'minesweeper' && <MinesweeperApp />}
+              {win.appId === 'cs_trainer' && <CounterStrikeTrainer />}
+              {win.appId === 'notepad' && (
+                <NotepadApp initialContent={win.extraData?.initialContent} />
+              )}
+              {win.appId === 'paint' && <PaintApp />}
+              {win.appId === 'sticky_note_app' && (
+                <StickyNoteApp
+                  notes={stickyNotes}
+                  onAddStickyNote={(noteDraft) => {
+                    const newNote: StickyNote = {
+                      ...noteDraft,
+                      id: `sticky_${Date.now()}`,
+                      zIndex: maxZIndex + 1,
+                    };
+                    setMaxZIndex(maxZIndex + 1);
+                    setStickyNotes((prev) => [...prev, newNote]);
+                  }}
+                  onUpdateNote={updateStickyNote}
+                  onDeleteNote={deleteStickyNote}
+                />
+              )}
+            </WindowFrame>
+          ))}
+        </div>
+
+        {/* Music Player YouTube Stream Dock */}
+        <MusicPlayerDock />
+
+        {/* 6. Authentic Windows XP Taskbar */}
+        <Taskbar
+          windows={windows}
+          activeWindowId={activeWindowId}
+          onFocusWindow={focusWindow}
+          onToggleMinimize={toggleMinimizeWindow}
+          onOpenApp={openApp}
+          onShowDesktop={showDesktop}
+          onTriggerDegauss={triggerDegauss}
+          onToggleStickyNote={addStickyNote}
+          onShutDownRequest={() => setIsShuttingDownModal(true)}
+        />
+
+        {/* 7. Authentic Shut Down Dialog Overlay */}
+        {isShuttingDownModal && (
+          <ShutdownScreen
+            onCancel={() => setIsShuttingDownModal(false)}
+            onRestart={() => {
+              setIsShuttingDownModal(false);
+              setIsBooted(false);
+            }}
+          />
+        )}
+      </div>
+    </PlaylistProvider>
   );
 }

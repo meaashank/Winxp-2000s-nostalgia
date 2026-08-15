@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { playCrtPowerOn, playWindowsStartup, startAmbience } from '../utils/audio';
+import { playCrtPowerOn, playWindowsStartup } from '../utils/audio';
 
 interface BootScreenProps {
   onBootComplete: () => void;
@@ -28,7 +28,6 @@ export const BootScreen: React.FC<BootScreenProps> = ({ onBootComplete }) => {
     setTimeout(() => {
       setBootPhase('welcome');
       playWindowsStartup();
-      startAmbience();
     }, 3800);
 
     // 4. Reveal Desktop
@@ -51,6 +50,7 @@ export const BootScreen: React.FC<BootScreenProps> = ({ onBootComplete }) => {
   return (
     <div
       onClick={startBootSequence}
+      onContextMenu={(e) => e.preventDefault()}
       className="fixed inset-0 z-50 w-full h-full bg-[#050507] flex flex-col items-center justify-center cursor-pointer select-none overflow-hidden"
     >
       {/* 1. INITIAL TERMINAL OFF STATE */}

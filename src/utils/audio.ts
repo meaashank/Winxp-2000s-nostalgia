@@ -404,105 +404,101 @@ export function playDialupHandshake() {
   }
 }
 
-// 13. Room Tone & Rain Ambience (Procedural noise & low 60Hz hum)
-export function startAmbience(volume = 0.25) {
-  if (isAmbienceActive) return;
+// 12b. HP LaserJet Mechanical Printer Paper Feed & Stepper Motor Sound
+export function playLaserPrinter() {
   try {
     const ctx = getAudioContext();
-    isAmbienceActive = true;
+    const now = ctx.currentTime;
 
-    ambienceGainNode = ctx.createGain();
-    ambienceGainNode.gain.setValueAtTime(0.001, ctx.currentTime);
-    ambienceGainNode.gain.linearRampToValueAtTime(volume, ctx.currentTime + 1.5);
-    ambienceGainNode.connect(ctx.destination);
+    // Stepper motor spool up sound
+    const motorOsc = ctx.createOscillator();
+    const motorGain = ctx.createGain();
+    motorOsc.type = 'sawtooth';
+    motorOsc.frequency.setValueAtTime(140, now);
+    motorOsc.frequency.linearRampToValueAtTime(320, now + 0.4);
+    motorOsc.frequency.setValueAtTime(280, now + 0.9);
+    motorOsc.frequency.linearRampToValueAtTime(100, now + 1.6);
 
-    // Pink/Brown noise for rain outside cyber cafe window
-    const bufferSize = ctx.sampleRate * 3;
+    motorGain.gain.setValueAtTime(0.001, now);
+    motorGain.gain.linearRampToValueAtTime(0.08, now + 0.1);
+    motorGain.gain.setValueAtTime(0.07, now + 1.2);
+    motorGain.gain.exponentialRampToValueAtTime(0.001, now + 1.7);
+
+    const motorFilter = ctx.createBiquadFilter();
+    motorFilter.type = 'lowpass';
+    motorFilter.frequency.value = 650;
+
+    motorOsc.connect(motorFilter);
+    motorFilter.connect(motorGain);
+    motorGain.connect(ctx.destination);
+
+    motorOsc.start(now);
+    motorOsc.stop(now + 1.7);
+
+    // Mechanical roller click & paper friction
+    const bufferSize = Math.floor(ctx.sampleRate * 1.5);
     const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
     const data = buffer.getChannelData(0);
-    let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
     for (let i = 0; i < bufferSize; i++) {
-      const white = Math.random() * 2 - 1;
-      b0 = 0.99886 * b0 + white * 0.0555179;
-      b1 = 0.99332 * b1 + white * 0.0750759;
-      b2 = 0.96900 * b2 + white * 0.1538520;
-      b3 = 0.86650 * b3 + white * 0.3104856;
-      b4 = 0.55000 * b4 + white * 0.5329522;
-      b5 = -0.7616 * b5 - white * 0.0168980;
-      data[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + white * 0.5362) * 0.05;
-      b6 = white * 0.115926;
+      data[i] = (Math.random() * 2 - 1) * 0.2;
     }
+    const rollerNoise = ctx.createBufferSource();
+    rollerNoise.buffer = buffer;
 
-    const rainSource = ctx.createBufferSource();
-    rainSource.buffer = buffer;
-    rainSource.loop = true;
+    const noiseFilter = ctx.createBiquadFilter();
+    noiseFilter.type = 'bandpass';
+    noiseFilter.frequency.setValueAtTime(1800, now);
+    noiseFilter.Q.value = 3;
 
-    // Filter rain to sound like outside glass
-    const rainFilter = ctx.createBiquadFilter();
-    rainFilter.type = 'lowpass';
-    rainFilter.frequency.value = 1100;
+    const noiseGain = ctx.createGain();
+    noiseGain.gain.setValueAtTime(0.001, now);
+    noiseGain.gain.linearRampToValueAtTime(0.04, now + 0.2);
+    noiseGain.gain.setValueAtTime(0.035, now + 1.0);
+    noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 1.5);
 
-    rainSource.connect(rainFilter);
-    rainFilter.connect(ambienceGainNode);
-    rainSource.start();
-    rainNoiseSource = rainSource;
+    rollerNoise.connect(noiseFilter);
+    noiseFilter.connect(noiseGain);
+    noiseGain.connect(ctx.destination);
 
-    // Low 60Hz fluorescent tube transformer room hum
-    humOscillator = ctx.createOscillator();
-    const humGain = ctx.createGain();
-    humOscillator.type = 'sine';
-    humOscillator.frequency.value = 60;
-    humGain.gain.value = 0.018;
-
-    const humHarmonic = ctx.createOscillator();
-    const harmGain = ctx.createGain();
-    humHarmonic.type = 'sine';
-    humHarmonic.frequency.value = 120;
-    harmGain.gain.value = 0.008;
-
-    humOscillator.connect(humGain);
-    humGain.connect(ambienceGainNode);
-    humHarmonic.connect(harmGain);
-    harmGain.connect(ambienceGainNode);
-
-    humOscillator.start();
-    humHarmonic.start();
+    rollerNoise.start(now + 0.1);
+    rollerNoise.stop(now + 1.6);
   } catch (e) {
-    console.warn('Ambience audio start error', e);
+    console.warn(e);
   }
+}
+
+// 13. Room Tone & Rain Ambience (Disabled permanently per user request)
+export function startAmbience(_volume = 0.25) {
+  // Background ambient loop permanently disabled
+  stopAmbience();
 }
 
 export function stopAmbience() {
-  if (!isAmbienceActive || !ambienceGainNode || !audioCtx) return;
-  try {
-    const now = audioCtx.currentTime;
-    ambienceGainNode.gain.linearRampToValueAtTime(0.001, now + 0.6);
-    setTimeout(() => {
-      try {
-        if (rainNoiseSource && 'stop' in rainNoiseSource) {
-          (rainNoiseSource as AudioBufferSourceNode).stop();
-        }
-        if (humOscillator) {
-          humOscillator.stop();
-        }
-      } catch (e) {
-        // Ignore
-      }
-      isAmbienceActive = false;
-    }, 700);
-  } catch (e) {
-    isAmbienceActive = false;
+  if (ambienceGainNode && audioCtx) {
+    try {
+      ambienceGainNode.gain.setValueAtTime(0, audioCtx.currentTime);
+    } catch {
+      // ignore
+    }
   }
+  try {
+    if (rainNoiseSource && 'stop' in rainNoiseSource) {
+      (rainNoiseSource as AudioBufferSourceNode).stop();
+    }
+    if (humOscillator) {
+      humOscillator.stop();
+    }
+  } catch {
+    // Ignore
+  }
+  rainNoiseSource = null;
+  humOscillator = null;
+  isAmbienceActive = false;
 }
 
 export function toggleAmbience(): boolean {
-  if (isAmbienceActive) {
-    stopAmbience();
-    return false;
-  } else {
-    startAmbience();
-    return true;
-  }
+  stopAmbience();
+  return false;
 }
 
 // 14. Winamp Procedural Chiptune / Melodic Synth Player

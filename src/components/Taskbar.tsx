@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { WindowInstance, AppId } from '../types';
-import { playMouseClick, playCrtDegauss, toggleAmbience } from '../utils/audio';
+import { playMouseClick, playCrtDegauss } from '../utils/audio';
 import {
   Volume2,
   Activity,
@@ -24,8 +24,6 @@ interface TaskbarProps {
   onTriggerDegauss: () => void;
   onToggleStickyNote: () => void;
   onShutDownRequest: () => void;
-  isAmbienceActive: boolean;
-  onToggleAmbience: () => void;
 }
 
 export const Taskbar: React.FC<TaskbarProps> = ({
@@ -38,24 +36,40 @@ export const Taskbar: React.FC<TaskbarProps> = ({
   onTriggerDegauss,
   onToggleStickyNote,
   onShutDownRequest,
-  isAmbienceActive,
-  onToggleAmbience,
 }) => {
   const [isStartOpen, setIsStartOpen] = useState(false);
   const [timeStr, setTimeStr] = useState('');
+  const [dateStr, setDateStr] = useState('');
+  const [isClockDialogOpen, setIsClockDialogOpen] = useState(false);
   const startMenuRef = useRef<HTMLDivElement>(null);
+  const clockDialogRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const updateClock = () => {
-      const d = new Date();
-      setTimeStr(d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }));
+      const now = new Date();
+      const hours = now.getHours();
+      const minutes = now.getMinutes();
+      const ampm = hours >= 12 ? 'PM' : 'AM';
+      const formattedHours = hours % 12 || 12;
+      const formattedMinutes = minutes < 10 ? `0${minutes}` : minutes;
+      setTimeStr(`${formattedHours}:${formattedMinutes} ${ampm}`);
+      setDateStr(
+        now.toLocaleDateString('en-US', {
+          weekday: 'long',
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+        })
+      );
     };
+
     updateClock();
-    const timer = setInterval(updateClock, 1000);
-    return () => clearInterval(timer);
+    // Minute-level synchronized timer
+    const interval = setInterval(updateClock, 1000);
+    return () => clearInterval(interval);
   }, []);
 
-  // Close start menu when clicking outside
+  // Close start menu or clock dialog when clicking outside
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (
@@ -64,6 +78,13 @@ export const Taskbar: React.FC<TaskbarProps> = ({
         !(e.target as HTMLElement).closest('#start-button')
       ) {
         setIsStartOpen(false);
+      }
+      if (
+        clockDialogRef.current &&
+        !clockDialogRef.current.contains(e.target as Node) &&
+        !(e.target as HTMLElement).closest('#taskbar-clock-area')
+      ) {
+        setIsClockDialogOpen(false);
       }
     };
     window.addEventListener('mousedown', handleClickOutside);
@@ -205,21 +226,6 @@ export const Taskbar: React.FC<TaskbarProps> = ({
             <StickyIcon size={12} />
           </button>
 
-          {/* Ambience Audio Toggle */}
-          <button
-            type="button"
-            onClick={onToggleAmbience}
-            title={isAmbienceActive ? 'Turn Off Rain & Cafe Room Tone' : 'Turn On Rain & Cafe Room Tone'}
-            className={`p-1 hover:bg-white/20 rounded cursor-pointer text-[10px] flex items-center gap-1 ${
-              isAmbienceActive ? 'text-green-300' : 'text-gray-400'
-            }`}
-          >
-            <span>🌧️</span>
-            <span className="font-mono text-[9px] hidden sm:inline">
-              {isAmbienceActive ? 'AMB ON' : 'AMB OFF'}
-            </span>
-          </button>
-
           {/* Degauss Button */}
           <button
             type="button"
@@ -244,12 +250,74 @@ export const Taskbar: React.FC<TaskbarProps> = ({
             <Volume2 size={12} className="text-white" />
           </div>
 
-          {/* Clock & Session Timer */}
-          <div className="flex flex-col items-end pl-1 border-l border-white/20 font-tahoma text-[11px] leading-tight">
-            <span>{timeStr || '10:48 PM'}</span>
+          {/* Clock & Notification Tray Date */}
+          <div
+            id="taskbar-clock-area"
+            onClick={() => {
+              playMouseClick();
+              setIsClockDialogOpen((prev) => !prev);
+            }}
+            title={dateStr || 'Date and Time'}
+            className="flex flex-col items-end pl-1.5 pr-1 border-l border-white/20 font-tahoma text-[11px] leading-tight cursor-pointer hover:bg-white/10 rounded-xs py-0.5"
+          >
+            <span className="font-semibold tracking-tight">{timeStr || '10:48 PM'}</span>
           </div>
         </div>
       </div>
+
+      {/* 1b. Authentic Windows XP Date and Time Properties Popup */}
+      {isClockDialogOpen && (
+        <div
+          ref={clockDialogRef}
+          className="fixed bottom-[34px] right-2 w-[280px] z-50 bg-[#ece9d8] border-2 border-[#0055ea] rounded-t-sm shadow-[0_8px_24px_rgba(0,0,0,0.6)] font-tahoma select-none text-[11px] text-[#111] overflow-hidden"
+        >
+          {/* Header */}
+          <div className="bg-gradient-to-r from-[#0055ea] via-[#3593ff] to-[#0055ea] text-white px-2 py-1 flex items-center justify-between font-bold text-[11px]">
+            <span>Date and Time Properties</span>
+            <button
+              type="button"
+              onClick={() => setIsClockDialogOpen(false)}
+              className="w-4 h-4 bg-[#d13438] hover:bg-[#e81123] text-white flex items-center justify-center rounded-xs text-[10px] font-bold cursor-pointer"
+            >
+              ✕
+            </button>
+          </div>
+
+          <div className="p-2.5 space-y-2 bg-[#ece9d8]">
+            <div className="bg-white border border-[#7f9db9] p-2 rounded-xs shadow-inner">
+              <div className="font-bold text-[#002266] text-[11.5px] border-b pb-1 mb-1 text-center">
+                {dateStr}
+              </div>
+              <div className="text-center font-mono text-xl font-bold text-[#003399] py-1">
+                {timeStr}
+              </div>
+              <div className="text-center text-[10px] text-gray-500">
+                Local System Clock (Synced)
+              </div>
+            </div>
+
+            <div className="border border-[#7f9db9] p-2 rounded-xs text-[10px] space-y-1 bg-[#fbfbf9]">
+              <div className="font-bold text-[#003399]">Time Zone:</div>
+              <div className="text-gray-700 font-mono text-[9.5px]">
+                (GMT-07:00) Pacific Time (US & Canada)
+              </div>
+              <div className="text-gray-500 pt-1 text-[9px] border-t border-gray-200">
+                Automatically adjust clock for daylight saving changes
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-1.5 pt-1">
+              <button
+                type="button"
+                onClick={() => setIsClockDialogOpen(false)}
+                className="px-3 py-0.5 bg-[#ece9d8] hover:bg-[#d8d4c4] border border-[#7f9db9] rounded-xs font-bold text-[10.5px] cursor-pointer"
+              >
+                OK
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 2. Windows XP Start Menu Popup */}
       {isStartOpen && (
@@ -369,6 +437,17 @@ export const Taskbar: React.FC<TaskbarProps> = ({
                 >
                   <span className="text-lg">📄</span>
                   <span>Notepad</span>
+                </div>
+
+                <div
+                  onClick={() => {
+                    setIsStartOpen(false);
+                    onOpenApp('sticky_note_app');
+                  }}
+                  className="flex items-center gap-2 p-1 hover:bg-[#316ac5] hover:text-white rounded-xs cursor-pointer"
+                >
+                  <span className="text-lg">📝</span>
+                  <span>Sticky Notes Studio</span>
                 </div>
               </div>
 

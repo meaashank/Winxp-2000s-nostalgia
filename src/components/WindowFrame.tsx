@@ -67,32 +67,38 @@ export const WindowFrame: React.FC<WindowFrameProps> = ({
 
   const style: React.CSSProperties = instance.isMaximized
     ? {
+        position: 'fixed',
         left: 0,
         top: 0,
         width: '100vw',
-        height: 'calc(100vh - 30px)',
-        zIndex: instance.zIndex,
+        height: '100vh',
+        zIndex: 60, // Above taskbar (z-40) and desktop (z-10) for true fullscreen immersion
+        borderRadius: 0,
+        borderWidth: '2px',
       }
     : {
+        position: 'absolute',
         left: `${instance.position.x}px`,
         top: `${instance.position.y}px`,
         width: `${instance.size.width}px`,
         height: `${instance.size.height}px`,
         zIndex: instance.zIndex,
+        borderWidth: '3px',
       };
 
   return (
     <div
       id={`window-${instance.id}`}
       onMouseDown={onFocus}
-      className={`absolute flex flex-col rounded-t-[7px] select-none transition-shadow overflow-hidden ${
+      className={`flex flex-col select-none transition-all overflow-hidden ${
+        instance.isMaximized ? 'rounded-none border-[#0055ea]' : 'rounded-t-[7px]'
+      } ${
         isActive
           ? 'shadow-[0_8px_24px_rgba(0,0,0,0.6),0_2px_6px_rgba(0,0,0,0.4)] border-[#0055ea]'
           : 'shadow-[0_4px_14px_rgba(0,0,0,0.4)] border-[#7f9db9]'
       }`}
       style={{
         ...style,
-        borderWidth: '3px',
         borderStyle: 'solid',
       }}
     >

@@ -10,6 +10,7 @@ export type AppId =
   | 'paint'
   | 'control_panel'
   | 'sticky_notes_manager'
+  | 'sticky_note_app'
   | 'file_viewer'
   | 'recycle_bin';
 
@@ -73,6 +74,39 @@ export interface WinampTrack {
   duration: string;
   durationSec: number;
   audioNotes?: string; // synthesis tune pattern
+}
+
+export interface YouTubeTrack {
+  id: string; // YouTube video ID
+  title: string;
+  artist: string;
+  duration: string;
+  durationSec: number;
+  thumbnailUrl?: string;
+}
+
+export interface PlaylistContextType {
+  playlistId: string;
+  tracks: YouTubeTrack[];
+  currentTrackIndex: number;
+  currentTrack: YouTubeTrack | null;
+  isPlaying: boolean;
+  isLoading: boolean;
+  currentTime: number;
+  duration: number;
+  volume: number;
+  spectrumBars: number[];
+  eqValues: number[];
+  play: () => void;
+  pause: () => void;
+  togglePlay: () => void;
+  stop: () => void;
+  nextTrack: () => void;
+  prevTrack: () => void;
+  selectTrack: (index: number) => void;
+  setVolume: (volume: number) => void;
+  seekTo: (seconds: number) => void;
+  setEqBand: (bandIndex: number, value: number) => void;
 }
 
 export interface FileItem {

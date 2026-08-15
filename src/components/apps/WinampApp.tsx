@@ -1,80 +1,67 @@
-import React, { useState, useEffect, useRef } from 'react';
-import {
-  playWinampTrack,
-  stopWinampSynth,
-  WINAMP_PLAYLIST,
-  playMouseClick,
-} from '../../utils/audio';
-import { Play, Pause, Square, SkipBack, SkipForward, Volume2, Disc } from 'lucide-react';
+import React, { useState } from 'react';
+import { usePlaylist } from '../PlaylistProvider';
+import { Play, Pause, Square, SkipBack, SkipForward, Volume2, Disc, ListMusic } from 'lucide-react';
+import { playMouseClick } from '../../utils/audio';
 
 export const WinampApp: React.FC = () => {
-  const [currentTrackIdx, setCurrentTrackIdx] = useState(0);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [volume, setVolume] = useState(80);
-  const [spectrumBars, setSpectrumBars] = useState<number[]>([40, 60, 80, 50, 70, 45, 30, 20]);
+  const {
+    tracks,
+    currentTrackIndex,
+    currentTrack,
+    isPlaying,
+    isLoading,
+    currentTime,
+    duration,
+    volume,
+    spectrumBars,
+    eqValues,
+    play,
+    pause,
+    stop,
+    nextTrack,
+    prevTrack,
+    selectTrack,
+    setVolume,
+    seekTo,
+    setEqBand,
+    playlistId,
+  } = usePlaylist();
+
   const [showPlaylist, setShowPlaylist] = useState(true);
   const [showEq, setShowEq] = useState(false);
-  const [eqValues, setEqValues] = useState<number[]>([0, 2, 4, 1, -1, 3, 2, 0]);
-  const [useYoutube, setUseYoutube] = useState(false);
 
-  const stopAudioRef = useRef<(() => void) | null>(null);
-
-  const currentTrack = WINAMP_PLAYLIST[currentTrackIdx];
+  // Format seconds to mm:ss
+  const formatTime = (secs: number) => {
+    if (!secs || isNaN(secs)) return '0:00';
+    const m = Math.floor(secs / 60);
+    const s = Math.floor(secs % 60);
+    return `${m}:${s < 10 ? '0' : ''}${s}`;
+  };
 
   const handlePlay = () => {
     playMouseClick();
-    if (isPlaying) return;
-    setIsPlaying(true);
-
-    if (!useYoutube) {
-      stopAudioRef.current = playWinampTrack(currentTrackIdx, (bars) => {
-        setSpectrumBars(bars);
-      });
-    }
+    play();
   };
 
   const handlePause = () => {
     playMouseClick();
-    setIsPlaying(false);
-    if (stopAudioRef.current) {
-      stopAudioRef.current();
-      stopAudioRef.current = null;
-    }
-    stopWinampSynth();
-    setSpectrumBars([0, 0, 0, 0, 0, 0, 0, 0]);
+    pause();
   };
 
   const handleStop = () => {
     playMouseClick();
-    handlePause();
+    stop();
   };
 
   const handleNext = () => {
     playMouseClick();
-    const nextIdx = (currentTrackIdx + 1) % WINAMP_PLAYLIST.length;
-    setCurrentTrackIdx(nextIdx);
-    if (isPlaying) {
-      if (stopAudioRef.current) stopAudioRef.current();
-      stopAudioRef.current = playWinampTrack(nextIdx, (bars) => setSpectrumBars(bars));
-    }
+    nextTrack();
   };
 
   const handlePrev = () => {
     playMouseClick();
-    const prevIdx = (currentTrackIdx - 1 + WINAMP_PLAYLIST.length) % WINAMP_PLAYLIST.length;
-    setCurrentTrackIdx(prevIdx);
-    if (isPlaying) {
-      if (stopAudioRef.current) stopAudioRef.current();
-      stopAudioRef.current = playWinampTrack(prevIdx, (bars) => setSpectrumBars(bars));
-    }
+    prevTrack();
   };
-
-  useEffect(() => {
-    return () => {
-      if (stopAudioRef.current) stopAudioRef.current();
-      stopWinampSynth();
-    };
-  }, []);
 
   return (
     <div className="w-full h-full bg-[#1b1c20] text-[#00ff00] font-mono text-[10px] flex flex-col p-1.5 select-none overflow-y-auto">
@@ -83,12 +70,12 @@ export const WinampApp: React.FC = () => {
         {/* Top Header & Track Marquee Screen */}
         <div className="bg-[#000000] border border-[#333a44] p-1.5 rounded-xs flex items-center justify-between mb-2">
           {/* Animated 8-band Green LED Spectrum Analyzer */}
-          <div className="flex items-end gap-1 h-7 w-20 bg-[#080808] p-0.5 border border-[#222]">
+          <div className="flex items-end gap-1 h-7 w-24 bg-[#080808] p-0.5 border border-[#222]">
             {spectrumBars.map((bar, idx) => (
               <div
                 key={idx}
-                className="w-2 bg-gradient-to-t from-[#00aa00] via-[#88ff00] to-[#ffff00] rounded-xs transition-all duration-100"
-                style={{ height: `${isPlaying ? bar : 5}%` }}
+                className="w-2.5 bg-gradient-to-t from-[#00aa00] via-[#88ff00] to-[#ffff00] rounded-xs transition-all duration-75"
+                style={{ height: `${isPlaying ? Math.max(8, bar) : 5}%` }}
               />
             ))}
           </div>
@@ -96,14 +83,32 @@ export const WinampApp: React.FC = () => {
           {/* Marquee Track Title Display */}
           <div className="flex-1 px-2 overflow-hidden">
             <div className="text-[#00ff44] text-[11px] font-pixel truncate tracking-wider">
-              {isPlaying ? `▶ ${currentTrackIdx + 1}. ${currentTrack.artist} - ${currentTrack.title}` : `❚❚ WINAMP 2.91 - CABIN 04`}
+              {isPlaying
+                ? `▶ ${currentTrackIndex + 1}. ${currentTrack?.artist || 'Unknown'} - ${currentTrack?.title || 'Track'}`
+                : isLoading
+                ? `⌛ CONNECTING TO PLAYLIST ${playlistId}...`
+                : `❚❚ WINAMP 2.91 - [${currentTrackIndex + 1}/${tracks.length}] ${currentTrack?.title || 'IDLE'}`}
             </div>
             <div className="flex justify-between text-[9px] text-[#00cc33] font-pixel mt-0.5">
-              <span>128 KBPS / 44.1 KHZ</span>
-              <span>{isPlaying ? 'STEREO' : 'IDLE'}</span>
-              <span>{currentTrack.duration}</span>
+              <span>192 KBPS / 44.1 KHZ</span>
+              <span className="text-yellow-400 font-bold">{isPlaying ? 'STEREO LIVE' : isLoading ? 'BUFFERING' : 'IDLE'}</span>
+              <span>
+                {formatTime(currentTime)} / {duration > 0 ? formatTime(duration) : currentTrack?.duration || '3:30'}
+              </span>
             </div>
           </div>
+        </div>
+
+        {/* Track Seek Progress Bar */}
+        <div className="mb-2 px-0.5">
+          <input
+            type="range"
+            min="0"
+            max={duration || 100}
+            value={currentTime || 0}
+            onChange={(e) => seekTo(Number(e.target.value))}
+            className="w-full h-1.5 bg-[#0a0a0a] accent-[#00ff44] rounded cursor-pointer"
+          />
         </div>
 
         {/* Transport & Playback Controls */}
@@ -201,7 +206,7 @@ export const WinampApp: React.FC = () => {
       {showEq && (
         <div className="mt-1 bg-gradient-to-b from-[#24272c] to-[#121315] border border-[#555a64] rounded-xs p-1.5">
           <div className="text-[9px] text-[#00ff44] font-pixel mb-1 flex justify-between">
-            <span>WINAMP EQUALIZER</span>
+            <span>WINAMP GRAPHIC EQUALIZER</span>
             <span>+12dB — 0 — -12dB</span>
           </div>
           <div className="flex justify-between items-center px-1">
@@ -211,12 +216,8 @@ export const WinampApp: React.FC = () => {
                   type="range"
                   min="-12"
                   max="12"
-                  value={eqValues[idx]}
-                  onChange={(e) => {
-                    const next = [...eqValues];
-                    next[idx] = Number(e.target.value);
-                    setEqValues(next);
-                  }}
+                  value={eqValues[idx] || 0}
+                  onChange={(e) => setEqBand(idx, Number(e.target.value))}
                   className="h-12 -rotate-90 w-12 accent-[#00ff44] bg-[#111] cursor-pointer"
                 />
                 <span className="text-[8px] text-gray-400 font-mono">{band}</span>
@@ -226,66 +227,65 @@ export const WinampApp: React.FC = () => {
         </div>
       )}
 
-      {/* Playlist Drawer */}
+      {/* Dynamic YouTube Playlist Drawer */}
       {showPlaylist && (
         <div className="mt-1 flex-1 bg-[#000000] border border-[#3a3f47] p-1.5 rounded-xs flex flex-col justify-between">
-          <div className="text-[9px] text-[#00ff44] font-pixel border-b border-[#222] pb-0.5 mb-1 flex justify-between">
-            <span>WINAMP PLAYLIST ({WINAMP_PLAYLIST.length} TRACKS)</span>
-            <span>TOTAL: 20:17</span>
+          <div className="text-[9px] text-[#00ff44] font-pixel border-b border-[#222] pb-0.5 mb-1 flex items-center justify-between">
+            <div className="flex items-center gap-1.5">
+              <ListMusic size={11} className="text-yellow-400" />
+              <span>YOUTUBE PLAYLIST ({tracks.length} SONGS)</span>
+            </div>
+            <span className="text-gray-400 font-mono text-[8.5px]">ID: {playlistId}</span>
           </div>
 
-          <div className="space-y-0.5 overflow-y-auto max-h-36 divide-y divide-[#151515]">
-            {WINAMP_PLAYLIST.map((track, idx) => (
+          <div className="space-y-0.5 overflow-y-auto max-h-48 divide-y divide-[#151515]">
+            {tracks.map((track, idx) => (
               <div
-                key={track.title}
+                key={`${track.id}_${idx}`}
                 onClick={() => {
                   playMouseClick();
-                  setCurrentTrackIdx(idx);
-                  if (isPlaying) {
-                    if (stopAudioRef.current) stopAudioRef.current();
-                    stopAudioRef.current = playWinampTrack(idx, (bars) => setSpectrumBars(bars));
-                  }
+                  selectTrack(idx);
                 }}
-                className={`flex items-center justify-between px-1.5 py-0.5 cursor-pointer rounded-xs text-[9.5px] font-pixel ${
-                  currentTrackIdx === idx
+                className={`flex items-center justify-between px-1.5 py-1 cursor-pointer rounded-xs text-[9.5px] font-pixel ${
+                  currentTrackIndex === idx
                     ? 'bg-[#002244] text-[#00ff66] font-bold border-l-2 border-[#00ff44]'
                     : 'text-[#88bb88] hover:bg-[#111]'
                 }`}
               >
-                <div className="truncate pr-2">
-                  <span>{idx + 1}. </span>
-                  <span>{track.artist} - {track.title}</span>
+                <div className="truncate pr-2 flex items-center gap-1.5">
+                  <span className="text-gray-500 w-4 shrink-0 font-mono">{idx + 1}.</span>
+                  {track.thumbnailUrl && (
+                    <img
+                      src={track.thumbnailUrl}
+                      alt=""
+                      referrerPolicy="no-referrer"
+                      className="w-5 h-4 object-cover rounded-xs shrink-0 border border-gray-800"
+                    />
+                  )}
+                  <span className="truncate">
+                    {track.artist ? `${track.artist} - ` : ''}{track.title}
+                  </span>
                 </div>
-                <span className="text-gray-500 font-mono text-[9px]">{track.duration}</span>
+                <div className="flex items-center gap-1 shrink-0">
+                  {currentTrackIndex === idx && isPlaying && (
+                    <span className="text-[8px] bg-green-950 text-green-400 border border-green-700 px-1 rounded-xs">
+                      PLAYING
+                    </span>
+                  )}
+                  <span className="text-gray-500 font-mono text-[9px]">{track.duration}</span>
+                </div>
               </div>
             ))}
           </div>
 
-          {/* YouTube Archival Stream Drawer Option */}
-          <div className="mt-2 pt-1 border-t border-[#222] flex items-center justify-between text-[9px] text-gray-400">
-            <button
-              type="button"
-              onClick={() => setUseYoutube(!useYoutube)}
-              className="text-[#00ff44] hover:underline flex items-center gap-1 cursor-pointer"
-            >
-              <Disc size={10} />
-              <span>{useYoutube ? 'Switch to Chiptune Synth' : 'Load Official YouTube Playlist'}</span>
-            </button>
-            <span>Cabin 04 Soundcard</span>
-          </div>
-
-          {useYoutube && (
-            <div className="mt-1 border border-[#333] rounded overflow-hidden">
-              <iframe
-                title="2000s Archival Playlist"
-                width="100%"
-                height="100"
-                src="https://www.youtube.com/embed/videoseries?list=PL3-sRm8xAzY9w6N2m0_Xj_dE4q_d78Z4b&autoplay=0"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                className="w-full"
-              />
+          {/* YouTube Playlist Connection Status Bar */}
+          <div className="mt-2 pt-1 border-t border-[#222] flex items-center justify-between text-[9px] text-gray-400 font-pixel">
+            <div className="flex items-center gap-1 text-[#00ff44]">
+              <Disc size={10} className={isPlaying ? 'animate-spin' : ''} />
+              <span>STREAM SOURCE: YOUTUBE PLAYLIST ({playlistId.slice(0, 16)}...)</span>
             </div>
-          )}
+            <span className="text-gray-500">CABIN 04 AUDIO DSP</span>
+          </div>
         </div>
       )}
     </div>
