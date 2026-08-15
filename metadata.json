@@ -1,0 +1,6 @@
+{
+  "name": "Midnight Cyber Café",
+  "description": "An authentic late-night 2004 internet café terminal preservation in Cabin 04 with playable CRT desktop, period software, and tactile environment.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
