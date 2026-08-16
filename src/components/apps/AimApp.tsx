@@ -264,16 +264,36 @@ export const AimApp: React.FC<AimAppProps> = ({ onTriggerBuzz }) => {
               </span>
             </div>
 
-            {/* BUZZ Button */}
-            <button
-              type="button"
-              onClick={handleSendBuzz}
-              title="Send a Buzz! (Shakes both screens with sound)"
-              className="flex items-center gap-1 px-2 py-0.5 bg-gradient-to-b from-[#fff2a8] to-[#ffd040] hover:brightness-105 active:brightness-95 border border-[#c49a00] rounded text-[10px] font-bold text-[#664d00] cursor-pointer shadow-xs"
-            >
-              <BellRing size={11} />
-              <span>BUZZ</span>
-            </button>
+            {/* Header Action Buttons */}
+            <div className="flex items-center gap-1.5">
+              {/* BUZZ Button */}
+              <button
+                type="button"
+                onClick={handleSendBuzz}
+                title="Send a Buzz! (Shakes both screens with sound)"
+                className="flex items-center gap-1 px-2 py-0.5 bg-gradient-to-b from-[#fff2a8] to-[#ffd040] hover:brightness-105 active:brightness-95 border border-[#c49a00] rounded text-[10px] font-bold text-[#664d00] cursor-pointer shadow-xs"
+              >
+                <BellRing size={11} />
+                <span>BUZZ</span>
+              </button>
+
+              {/* Close / Clear Chat Button */}
+              <button
+                type="button"
+                onClick={() => {
+                  playMouseClick();
+                  setChatHistory((prev) => ({
+                    ...prev,
+                    [selectedBuddy]: [],
+                  }));
+                }}
+                title="Clear Chat History"
+                className="w-4 h-4 bg-[#ece9d8] hover:bg-[#d8d4c4] border border-[#7f9db9] rounded-xs text-[#555] hover:text-[#000] flex items-center justify-center text-[10px] font-bold cursor-pointer"
+                aria-label="Clear chat"
+              >
+                ✕
+              </button>
+            </div>
           </div>
 
           {/* Message Stream */}

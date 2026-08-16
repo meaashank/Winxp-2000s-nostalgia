@@ -1,7 +1,19 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
-import { PlaylistContextType, YouTubeTrack } from '../types';
+import { PlaylistContextType, YouTubeTrack, PlaylistItem } from '../types';
+import { parseYouTubeInput } from '../utils/youtube';
 
-export const YOUTUBE_PLAYLIST_ID = 'PLt4QqxffzV0D8YNJ0Xdh34CRifqctJ8ms';
+export const DEFAULT_PLAYLIST_ID = 'PLt4QqxffzV0D8YNJ0Xdh34CRifqctJ8ms';
+export const DEFAULT_PLAYLIST_TITLE = 'Cabin 04: Classic Gaming & Lo-Fi Chill';
+
+export const DEFAULT_PLAYLIST: PlaylistItem = {
+  id: DEFAULT_PLAYLIST_ID,
+  title: DEFAULT_PLAYLIST_TITLE,
+  isCustom: false,
+  type: 'playlist',
+};
+
+const SESSION_PLAYLISTS_KEY = 'cabin04_session_playlists';
+const SESSION_ACTIVE_ID_KEY = 'cabin04_active_playlist_id';
 
 declare global {
   interface Window {
@@ -20,32 +32,62 @@ export const usePlaylist = () => {
   return context;
 };
 
-// Default initial tracks placeholder while the live YouTube playlist loads
+// Initial fallback track placeholders while live YouTube metadata loads
 const INITIAL_FALLBACK_TRACKS: YouTubeTrack[] = [
   {
     id: 'loading_1',
     title: 'Loading Playlist Track 1...',
-    artist: 'YouTube Playlist PLt4QqxffzV0D8YNJ0Xdh34CRifqctJ8ms',
+    artist: 'YouTube Stream',
     duration: '3:45',
     durationSec: 225,
   },
   {
     id: 'loading_2',
     title: 'Loading Playlist Track 2...',
-    artist: 'YouTube Playlist PLt4QqxffzV0D8YNJ0Xdh34CRifqctJ8ms',
+    artist: 'YouTube Stream',
     duration: '4:10',
     durationSec: 250,
   },
   {
     id: 'loading_3',
     title: 'Loading Playlist Track 3...',
-    artist: 'YouTube Playlist PLt4QqxffzV0D8YNJ0Xdh34CRifqctJ8ms',
+    artist: 'YouTube Stream',
     duration: '3:20',
     durationSec: 200,
   },
 ];
 
 export const PlaylistProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  // 1. Session-based playlists list
+  const [playlists, setPlaylists] = useState<PlaylistItem[]>(() => {
+    try {
+      const stored = sessionStorage.getItem(SESSION_PLAYLISTS_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          // Ensure default playlist is always present
+          const hasDefault = parsed.some((p: PlaylistItem) => p.id === DEFAULT_PLAYLIST_ID);
+          return hasDefault ? parsed : [DEFAULT_PLAYLIST, ...parsed];
+        }
+      }
+    } catch {
+      // ignore
+    }
+    return [DEFAULT_PLAYLIST];
+  });
+
+  // 2. Active Playlist ID
+  const [playlistId, setPlaylistId] = useState<string>(() => {
+    try {
+      const storedActive = sessionStorage.getItem(SESSION_ACTIVE_ID_KEY);
+      if (storedActive) return storedActive;
+    } catch {
+      // ignore
+    }
+    return DEFAULT_PLAYLIST_ID;
+  });
+
+  const [isAddPlaylistModalOpen, setIsAddPlaylistModalOpen] = useState(false);
   const [tracks, setTracks] = useState<YouTubeTrack[]>(INITIAL_FALLBACK_TRACKS);
   const [currentTrackIndex, setCurrentTrackIndex] = useState<number>(0);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
@@ -62,7 +104,25 @@ export const PlaylistProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const isApiReadyRef = useRef<boolean>(false);
   const currentVideoDataRef = useRef<{ title: string; author: string; video_id: string } | null>(null);
 
-  // Fetch playlist video metadata helper
+  // Sync playlists list to sessionStorage
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(SESSION_PLAYLISTS_KEY, JSON.stringify(playlists));
+    } catch {
+      // ignore
+    }
+  }, [playlists]);
+
+  // Sync active playlist ID to sessionStorage
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(SESSION_ACTIVE_ID_KEY, playlistId);
+    } catch {
+      // ignore
+    }
+  }, [playlistId]);
+
+  // Helper: Fetch oEmbed metadata for a single video or track
   const fetchVideoMetadata = async (videoId: string): Promise<{ title: string; artist: string }> => {
     try {
       const res = await fetch(`https://noembed.com/embed?url=https://www.youtube.com/watch?v=${videoId}`);
@@ -71,7 +131,6 @@ export const PlaylistProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         if (data && data.title) {
           const rawTitle = data.title;
           const author = data.author_name || 'Various Artists';
-          // Split title if formatted as "Artist - Title"
           if (rawTitle.includes(' - ')) {
             const [art, ...rest] = rawTitle.split(' - ');
             return {
@@ -94,7 +153,7 @@ export const PlaylistProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     };
   };
 
-  // Populate playlist video IDs and fetch all titles
+  // Populate playlist video IDs and fetch track titles
   const populatePlaylistTracks = useCallback(async (videoIds: string[]) => {
     if (!videoIds || videoIds.length === 0) return;
     setIsLoading(true);
@@ -120,10 +179,26 @@ export const PlaylistProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   }, []);
 
   // Fetch playlist RSS feed for full tracks listing
-  const fetchPlaylistRss = useCallback(async () => {
+  const fetchPlaylistRss = useCallback(async (targetPlaylistId: string) => {
+    // If it's a single video ID (11 chars and not starting with PL/RD/etc.)
+    if (/^[a-zA-Z0-9_-]{11}$/.test(targetPlaylistId) && !targetPlaylistId.startsWith('PL')) {
+      const meta = await fetchVideoMetadata(targetPlaylistId);
+      setTracks([
+        {
+          id: targetPlaylistId,
+          title: meta.title,
+          artist: meta.artist,
+          duration: '3:45',
+          durationSec: 225,
+          thumbnailUrl: `https://i.ytimg.com/vi/${targetPlaylistId}/hqdefault.jpg`,
+        },
+      ]);
+      setIsLoading(false);
+      return;
+    }
+
     try {
-      const rssUrl = `https://www.youtube.com/feeds/videos.xml?playlist_id=${YOUTUBE_PLAYLIST_ID}`;
-      // Use public CORS proxies to parse the XML feed if direct fails
+      const rssUrl = `https://www.youtube.com/feeds/videos.xml?playlist_id=${targetPlaylistId}`;
       const proxies = [
         `https://api.allorigins.win/raw?url=${encodeURIComponent(rssUrl)}`,
         `https://corsproxy.io/?${encodeURIComponent(rssUrl)}`,
@@ -175,7 +250,7 @@ export const PlaylistProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             }
           }
         } catch {
-          // Continue to next proxy
+          // try next proxy
         }
       }
     } catch {
@@ -206,7 +281,6 @@ export const PlaylistProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           title = parts.slice(1).join(' - ').trim();
         }
 
-        // Update the current track in the tracks list
         setTracks((prev) => {
           const next = [...prev];
           if (next[idx]) {
@@ -215,7 +289,9 @@ export const PlaylistProvider: React.FC<{ children: React.ReactNode }> = ({ chil
               id: videoData.video_id || next[idx].id,
               title,
               artist,
-              thumbnailUrl: videoData.video_id ? `https://i.ytimg.com/vi/${videoData.video_id}/hqdefault.jpg` : next[idx].thumbnailUrl,
+              thumbnailUrl: videoData.video_id
+                ? `https://i.ytimg.com/vi/${videoData.video_id}/hqdefault.jpg`
+                : next[idx].thumbnailUrl,
             };
           } else {
             next.push({
@@ -239,9 +315,120 @@ export const PlaylistProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
   }, [currentTrackIndex]);
 
+  // Load a specified playlist into the player
+  const loadPlaylist = useCallback(
+    (newPlaylistId: string) => {
+      setPlaylistId(newPlaylistId);
+      setIsLoading(true);
+      setCurrentTrackIndex(0);
+      setCurrentTime(0);
+
+      // Fetch RSS feed
+      fetchPlaylistRss(newPlaylistId);
+
+      if (playerRef.current && isApiReadyRef.current) {
+        try {
+          const isSingleVideo = /^[a-zA-Z0-9_-]{11}$/.test(newPlaylistId) && !newPlaylistId.startsWith('PL');
+          if (isSingleVideo) {
+            if (playerRef.current.loadVideoById) {
+              playerRef.current.loadVideoById(newPlaylistId);
+            }
+          } else {
+            if (playerRef.current.loadPlaylist) {
+              playerRef.current.loadPlaylist({
+                list: newPlaylistId,
+                listType: 'playlist',
+                index: 0,
+              });
+            }
+          }
+          setIsPlaying(true);
+          setTimeout(syncCurrentTrackFromPlayer, 800);
+        } catch (e) {
+          console.warn('Error loading playlist into YT player:', e);
+        }
+      }
+    },
+    [fetchPlaylistRss, syncCurrentTrackFromPlayer]
+  );
+
+  // Add custom playlist from URL or ID
+  const addCustomPlaylist = useCallback(
+    async (
+      input: string,
+      customTitle?: string
+    ): Promise<{ success: boolean; message?: string; playlist?: PlaylistItem }> => {
+      const parsed = parseYouTubeInput(input);
+      if (!parsed) {
+        return {
+          success: false,
+          message: 'Invalid YouTube playlist URL or ID. Please check the link and try again.',
+        };
+      }
+
+      // Check if already in playlists
+      const existing = playlists.find((p) => p.id === parsed.id);
+      if (existing) {
+        loadPlaylist(existing.id);
+        return {
+          success: true,
+          playlist: existing,
+          message: 'Switched to existing playlist.',
+        };
+      }
+
+      // Determine friendly title
+      let title = customTitle?.trim();
+      if (!title) {
+        if (parsed.type === 'video') {
+          const meta = await fetchVideoMetadata(parsed.id);
+          title = `${meta.artist} - ${meta.title}`;
+        } else {
+          title = `Custom Playlist (${parsed.id.slice(0, 8)}...)`;
+        }
+      }
+
+      const newPlaylistItem: PlaylistItem = {
+        id: parsed.id,
+        title,
+        isCustom: true,
+        type: parsed.type,
+        addedAt: Date.now(),
+      };
+
+      setPlaylists((prev) => [newPlaylistItem, ...prev]);
+      loadPlaylist(parsed.id);
+
+      return {
+        success: true,
+        playlist: newPlaylistItem,
+      };
+    },
+    [playlists, loadPlaylist]
+  );
+
+  // Remove custom playlist
+  const removeCustomPlaylist = useCallback(
+    (idToRemove: string) => {
+      if (idToRemove === DEFAULT_PLAYLIST_ID) return; // Prevent removing default
+
+      setPlaylists((prev) => prev.filter((p) => p.id !== idToRemove));
+
+      if (playlistId === idToRemove) {
+        loadPlaylist(DEFAULT_PLAYLIST_ID);
+      }
+    },
+    [playlistId, loadPlaylist]
+  );
+
+  // Reset to default playlist
+  const resetToDefaultPlaylist = useCallback(() => {
+    loadPlaylist(DEFAULT_PLAYLIST_ID);
+  }, [loadPlaylist]);
+
   // Initialize YouTube Iframe Player
   useEffect(() => {
-    fetchPlaylistRss();
+    fetchPlaylistRss(playlistId);
 
     const initPlayer = () => {
       if (window.YT && window.YT.Player) {
@@ -249,21 +436,35 @@ export const PlaylistProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         if (!container) return;
 
         try {
+          const isSingleVideo = /^[a-zA-Z0-9_-]{11}$/.test(playlistId) && !playlistId.startsWith('PL');
+
           playerRef.current = new window.YT.Player('youtube-player-hidden-frame', {
             height: '180',
             width: '320',
-            playerVars: {
-              listType: 'playlist',
-              list: YOUTUBE_PLAYLIST_ID,
-              autoplay: 0,
-              controls: 1,
-              disablekb: 0,
-              enablejsapi: 1,
-              fs: 0,
-              modestbranding: 1,
-              playsinline: 1,
-              rel: 0,
-            },
+            playerVars: isSingleVideo
+              ? {
+                  videoId: playlistId,
+                  autoplay: 0,
+                  controls: 1,
+                  disablekb: 0,
+                  enablejsapi: 1,
+                  fs: 0,
+                  modestbranding: 1,
+                  playsinline: 1,
+                  rel: 0,
+                }
+              : {
+                  listType: 'playlist',
+                  list: playlistId,
+                  autoplay: 0,
+                  controls: 1,
+                  disablekb: 0,
+                  enablejsapi: 1,
+                  fs: 0,
+                  modestbranding: 1,
+                  playsinline: 1,
+                  rel: 0,
+                },
             events: {
               onReady: (event: any) => {
                 isApiReadyRef.current = true;
@@ -280,15 +481,17 @@ export const PlaylistProvider: React.FC<{ children: React.ReactNode }> = ({ chil
                 }
               },
               onStateChange: (event: any) => {
-                // YT.PlayerState: -1 (unstarted), 0 (ended), 1 (playing), 2 (paused), 3 (buffering), 5 (video cued)
                 const state = event.data;
                 if (state === 1) {
+                  // Playing
                   setIsPlaying(true);
                   setIsLoading(false);
                   syncCurrentTrackFromPlayer();
                 } else if (state === 2 || state === 0) {
+                  // Paused or Ended
                   setIsPlaying(false);
                 } else if (state === 3) {
+                  // Buffering
                   setIsLoading(true);
                 }
                 syncCurrentTrackFromPlayer();
@@ -328,7 +531,7 @@ export const PlaylistProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         }
       }
     };
-  }, [fetchPlaylistRss, populatePlaylistTracks, syncCurrentTrackFromPlayer, volume]);
+  }, []); // Run once on mount
 
   // Audio spectrum visualizer physics & time ticker
   useEffect(() => {
@@ -339,8 +542,6 @@ export const PlaylistProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       lastTime = now;
 
       if (isPlaying) {
-        // Generate high-fidelity 8-band audio frequency analyzer bars
-        // Bands: 60Hz, 170Hz, 310Hz, 600Hz, 1kHz, 3kHz, 6kHz, 14kHz
         const t = now * 0.005;
         const beat1 = Math.sin(t * 2.5) * 0.5 + 0.5;
         const beat2 = Math.cos(t * 3.8) * 0.5 + 0.5;
@@ -362,14 +563,11 @@ export const PlaylistProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             else target = 10 + beat4 * 50 + eqBonus;
 
             target = Math.max(5, Math.min(100, target + (Math.random() * 15 - 7.5)));
-
-            // Smooth decay / rise
             const speed = target > bar ? 0.4 : 0.15;
             return bar + (target - bar) * speed;
           });
         });
       } else {
-        // Fast decay to idle when paused
         setSpectrumBars((prev) =>
           prev.map((bar) => {
             if (bar <= 2) return 0;
@@ -450,6 +648,33 @@ export const PlaylistProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
   }, [isPlaying, play, pause]);
 
+  // Global Spacebar Hotkey: Pressing Space toggles Play/Pause for YouTube & Winamp in sync
+  useEffect(() => {
+    const handleGlobalSpaceHotkey = (e: KeyboardEvent) => {
+      if (e.code === 'Space' || e.key === ' ') {
+        const target = e.target as HTMLElement | null;
+        if (target) {
+          const tag = target.tagName ? target.tagName.toUpperCase() : '';
+          // Ignore spacebar if user is typing inside text inputs, textareas, selects, or editable fields
+          if (
+            tag === 'INPUT' ||
+            tag === 'TEXTAREA' ||
+            tag === 'SELECT' ||
+            target.isContentEditable ||
+            target.getAttribute('contenteditable') === 'true'
+          ) {
+            return;
+          }
+        }
+        e.preventDefault();
+        togglePlay();
+      }
+    };
+
+    window.addEventListener('keydown', handleGlobalSpaceHotkey);
+    return () => window.removeEventListener('keydown', handleGlobalSpaceHotkey);
+  }, [togglePlay]);
+
   const stop = useCallback(() => {
     if (playerRef.current && playerRef.current.stopVideo) {
       try {
@@ -490,18 +715,21 @@ export const PlaylistProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
   }, [currentTrackIndex, syncCurrentTrackFromPlayer, tracks.length]);
 
-  const selectTrack = useCallback((index: number) => {
-    setCurrentTrackIndex(index);
-    if (playerRef.current && playerRef.current.playVideoAt) {
-      try {
-        playerRef.current.playVideoAt(index);
-        setIsPlaying(true);
-        setTimeout(syncCurrentTrackFromPlayer, 300);
-      } catch (e) {
-        console.warn('Select track error:', e);
+  const selectTrack = useCallback(
+    (index: number) => {
+      setCurrentTrackIndex(index);
+      if (playerRef.current && playerRef.current.playVideoAt) {
+        try {
+          playerRef.current.playVideoAt(index);
+          setIsPlaying(true);
+          setTimeout(syncCurrentTrackFromPlayer, 300);
+        } catch (e) {
+          console.warn('Select track error:', e);
+        }
       }
-    }
-  }, [syncCurrentTrackFromPlayer]);
+    },
+    [syncCurrentTrackFromPlayer]
+  );
 
   const setVolume = useCallback((vol: number) => {
     setVolumeState(vol);
@@ -533,10 +761,19 @@ export const PlaylistProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     });
   }, []);
 
+  const activePlaylist: PlaylistItem =
+    playlists.find((p) => p.id === playlistId) || {
+      id: playlistId,
+      title: playlistId === DEFAULT_PLAYLIST_ID ? DEFAULT_PLAYLIST_TITLE : 'Custom YouTube Playlist',
+      isCustom: playlistId !== DEFAULT_PLAYLIST_ID,
+    };
+
   const currentTrack = tracks[currentTrackIndex] || tracks[0] || null;
 
   const value: PlaylistContextType = {
-    playlistId: YOUTUBE_PLAYLIST_ID,
+    playlistId,
+    playlists,
+    activePlaylist,
     tracks,
     currentTrackIndex,
     currentTrack,
@@ -557,11 +794,13 @@ export const PlaylistProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setVolume,
     seekTo,
     setEqBand,
+    loadPlaylist,
+    addCustomPlaylist,
+    removeCustomPlaylist,
+    resetToDefaultPlaylist,
+    isAddPlaylistModalOpen,
+    setIsAddPlaylistModalOpen,
   };
 
-  return (
-    <PlaylistContext.Provider value={value}>
-      {children}
-    </PlaylistContext.Provider>
-  );
+  return <PlaylistContext.Provider value={value}>{children}</PlaylistContext.Provider>;
 };

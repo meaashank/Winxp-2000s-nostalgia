@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { usePlaylist } from '../PlaylistProvider';
-import { Play, Pause, Square, SkipBack, SkipForward, Volume2, Disc, ListMusic } from 'lucide-react';
+import { Play, Pause, Square, SkipBack, SkipForward, Volume2, Disc, ListMusic, Plus, Settings2 } from 'lucide-react';
 import { playMouseClick } from '../../utils/audio';
 
 export const WinampApp: React.FC = () => {
@@ -25,6 +25,10 @@ export const WinampApp: React.FC = () => {
     seekTo,
     setEqBand,
     playlistId,
+    playlists,
+    activePlaylist,
+    loadPlaylist,
+    setIsAddPlaylistModalOpen,
   } = usePlaylist();
 
   const [showPlaylist, setShowPlaylist] = useState(true);
@@ -86,11 +90,11 @@ export const WinampApp: React.FC = () => {
               {isPlaying
                 ? `▶ ${currentTrackIndex + 1}. ${currentTrack?.artist || 'Unknown'} - ${currentTrack?.title || 'Track'}`
                 : isLoading
-                ? `⌛ CONNECTING TO PLAYLIST ${playlistId}...`
+                ? `⌛ CONNECTING TO [${activePlaylist.title.toUpperCase()}]...`
                 : `❚❚ WINAMP 2.91 - [${currentTrackIndex + 1}/${tracks.length}] ${currentTrack?.title || 'IDLE'}`}
             </div>
             <div className="flex justify-between text-[9px] text-[#00cc33] font-pixel mt-0.5">
-              <span>192 KBPS / 44.1 KHZ</span>
+              <span className="truncate max-w-[140px] text-gray-400">{activePlaylist.title}</span>
               <span className="text-yellow-400 font-bold">{isPlaying ? 'STEREO LIVE' : isLoading ? 'BUFFERING' : 'IDLE'}</span>
               <span>
                 {formatTime(currentTime)} / {duration > 0 ? formatTime(duration) : currentTrack?.duration || '3:30'}
@@ -126,7 +130,7 @@ export const WinampApp: React.FC = () => {
             <button
               type="button"
               onClick={handlePlay}
-              title="Play"
+              title="Play (Space)"
               className={`p-1.5 bg-gradient-to-b from-[#555b66] to-[#2b2e34] hover:brightness-125 active:brightness-75 border border-white/30 rounded-xs cursor-pointer shadow-xs ${
                 isPlaying ? 'text-[#00ff66] border-green-500' : 'text-white'
               }`}
@@ -136,7 +140,7 @@ export const WinampApp: React.FC = () => {
             <button
               type="button"
               onClick={handlePause}
-              title="Pause"
+              title="Pause (Space)"
               className="p-1.5 bg-gradient-to-b from-[#555b66] to-[#2b2e34] hover:brightness-125 active:brightness-75 border border-white/30 rounded-xs text-white cursor-pointer shadow-xs"
             >
               <Pause size={10} />
@@ -230,14 +234,50 @@ export const WinampApp: React.FC = () => {
       {/* Dynamic YouTube Playlist Drawer */}
       {showPlaylist && (
         <div className="mt-1 flex-1 bg-[#000000] border border-[#3a3f47] p-1.5 rounded-xs flex flex-col justify-between">
-          <div className="text-[9px] text-[#00ff44] font-pixel border-b border-[#222] pb-0.5 mb-1 flex items-center justify-between">
-            <div className="flex items-center gap-1.5">
-              <ListMusic size={11} className="text-yellow-400" />
-              <span>YOUTUBE PLAYLIST ({tracks.length} SONGS)</span>
+          {/* Playlist Top Toolbar */}
+          <div className="text-[9px] text-[#00ff44] font-pixel border-b border-[#222] pb-1 mb-1 space-y-1">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5 truncate">
+                <ListMusic size={11} className="text-yellow-400 shrink-0" />
+                <span className="truncate font-bold">PLAYLIST: {activePlaylist.title.toUpperCase()}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  playMouseClick();
+                  setIsAddPlaylistModalOpen(true);
+                }}
+                className="px-1.5 py-0.5 bg-[#2b2e34] hover:bg-[#3d424b] text-yellow-300 border border-yellow-600 rounded-xs flex items-center gap-1 text-[8.5px] font-bold cursor-pointer shrink-0"
+                title="Add / Switch Playlists"
+              >
+                <Plus size={9} />
+                <span>+ ADD / MANAGE PL</span>
+              </button>
             </div>
-            <span className="text-gray-400 font-mono text-[8.5px]">ID: {playlistId}</span>
+
+            {/* Playlist Quick Switcher Dropdown */}
+            {playlists.length > 1 && (
+              <div className="flex items-center gap-1 text-[8.5px] text-gray-400">
+                <span>SWITCH:</span>
+                <select
+                  value={playlistId}
+                  onChange={(e) => {
+                    playMouseClick();
+                    loadPlaylist(e.target.value);
+                  }}
+                  className="flex-1 bg-[#151515] text-[#00ff66] border border-[#333] rounded-xs px-1 py-0.5 font-mono text-[8.5px] focus:outline-hidden"
+                >
+                  {playlists.map((pl) => (
+                    <option key={pl.id} value={pl.id}>
+                      {pl.title} {pl.isCustom ? '(Custom)' : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
 
+          {/* Songs List */}
           <div className="space-y-0.5 overflow-y-auto max-h-48 divide-y divide-[#151515]">
             {tracks.map((track, idx) => (
               <div
@@ -278,13 +318,26 @@ export const WinampApp: React.FC = () => {
             ))}
           </div>
 
-          {/* YouTube Playlist Connection Status Bar */}
-          <div className="mt-2 pt-1 border-t border-[#222] flex items-center justify-between text-[9px] text-gray-400 font-pixel">
+          {/* Winamp Playlist Action Bar & Hotkey Hint */}
+          <div className="mt-2 pt-1.5 border-t border-[#222] flex items-center justify-between text-[8.5px] text-gray-400 font-pixel">
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => {
+                  playMouseClick();
+                  setIsAddPlaylistModalOpen(true);
+                }}
+                className="px-1.5 py-0.5 bg-[#1f2329] hover:bg-[#2e3440] text-gray-300 border border-[#444] rounded-xs cursor-pointer flex items-center gap-1"
+              >
+                <Settings2 size={9} />
+                <span>LOAD LIST</span>
+              </button>
+              <span className="text-gray-500">HOTKEY: [SPACE] PLAY/PAUSE</span>
+            </div>
             <div className="flex items-center gap-1 text-[#00ff44]">
               <Disc size={10} className={isPlaying ? 'animate-spin' : ''} />
-              <span>STREAM SOURCE: YOUTUBE PLAYLIST ({playlistId.slice(0, 16)}...)</span>
+              <span>{tracks.length} TRACKS</span>
             </div>
-            <span className="text-gray-500">CABIN 04 AUDIO DSP</span>
           </div>
         </div>
       )}

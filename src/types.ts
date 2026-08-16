@@ -85,8 +85,19 @@ export interface YouTubeTrack {
   thumbnailUrl?: string;
 }
 
+export interface PlaylistItem {
+  id: string; // The YouTube playlist ID or single video ID
+  title: string;
+  isCustom?: boolean;
+  type?: 'playlist' | 'video';
+  itemCount?: number;
+  addedAt?: number;
+}
+
 export interface PlaylistContextType {
   playlistId: string;
+  playlists: PlaylistItem[];
+  activePlaylist: PlaylistItem;
   tracks: YouTubeTrack[];
   currentTrackIndex: number;
   currentTrack: YouTubeTrack | null;
@@ -107,6 +118,16 @@ export interface PlaylistContextType {
   setVolume: (volume: number) => void;
   seekTo: (seconds: number) => void;
   setEqBand: (bandIndex: number, value: number) => void;
+  // Playlist Management
+  loadPlaylist: (playlistId: string) => void;
+  addCustomPlaylist: (
+    input: string,
+    customTitle?: string
+  ) => Promise<{ success: boolean; message?: string; playlist?: PlaylistItem }>;
+  removeCustomPlaylist: (playlistId: string) => void;
+  resetToDefaultPlaylist: () => void;
+  isAddPlaylistModalOpen: boolean;
+  setIsAddPlaylistModalOpen: (open: boolean) => void;
 }
 
 export interface FileItem {

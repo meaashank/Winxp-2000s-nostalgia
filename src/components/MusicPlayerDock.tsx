@@ -1,6 +1,18 @@
 import React, { useState } from 'react';
 import { usePlaylist } from './PlaylistProvider';
-import { Play, Pause, SkipForward, SkipBack, Volume2, Music, Youtube, ChevronUp, ChevronDown } from 'lucide-react';
+import {
+  Play,
+  Pause,
+  SkipForward,
+  SkipBack,
+  Volume2,
+  Music,
+  Youtube,
+  ChevronUp,
+  ChevronDown,
+  ListMusic,
+  Plus,
+} from 'lucide-react';
 import { playMouseClick } from '../utils/audio';
 
 export const MusicPlayerDock: React.FC = () => {
@@ -9,7 +21,6 @@ export const MusicPlayerDock: React.FC = () => {
     currentTrackIndex,
     tracks,
     isPlaying,
-    isLoading,
     togglePlay,
     nextTrack,
     prevTrack,
@@ -17,10 +28,19 @@ export const MusicPlayerDock: React.FC = () => {
     setVolume,
     spectrumBars,
     playlistId,
+    playlists,
+    activePlaylist,
+    loadPlaylist,
+    setIsAddPlaylistModalOpen,
   } = usePlaylist();
 
   const [isExpanded, setIsExpanded] = useState(false);
   const [showVideo, setShowVideo] = useState(false);
+  const [isClosed, setIsClosed] = useState(false);
+
+  if (isClosed) {
+    return null;
+  }
 
   return (
     <div
@@ -44,22 +64,87 @@ export const MusicPlayerDock: React.FC = () => {
             <div className="truncate">
               <div className="text-[10px] font-bold text-green-400 truncate flex items-center gap-1.5">
                 <span>{isPlaying ? 'PLAYING' : 'PAUSED'}</span>
-                <span className="text-gray-400 font-normal">| YT: {playlistId.slice(0, 10)}...</span>
+                <span className="text-gray-400 font-normal">| {activePlaylist.title.slice(0, 18)}...</span>
               </div>
               <div className="text-[10px] text-gray-200 truncate">
-                {currentTrack ? `${currentTrack.artist} - ${currentTrack.title}` : 'Loading YouTube Playlist...'}
+                {currentTrack ? `${currentTrack.artist} - ${currentTrack.title}` : 'Loading YouTube Stream...'}
               </div>
             </div>
           </div>
 
           <div className="flex items-center gap-1 text-gray-400 pl-2">
-            {isExpanded ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                playMouseClick();
+                setIsExpanded(!isExpanded);
+              }}
+              className="p-0.5 hover:text-white cursor-pointer"
+              title={isExpanded ? 'Collapse' : 'Expand'}
+            >
+              {isExpanded ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
+            </button>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                playMouseClick();
+                setIsClosed(true);
+              }}
+              className="w-4 h-4 bg-[#d13438] hover:bg-[#e81123] active:bg-[#b0101d] text-white flex items-center justify-center rounded-xs text-[10px] font-bold cursor-pointer transition-colors shadow-xs ml-0.5"
+              title="Close Stream Dock"
+              aria-label="Close"
+            >
+              ✕
+            </button>
           </div>
         </div>
 
         {/* Expanded Controls & Video View */}
         {isExpanded && (
           <div className="p-2.5 bg-[#181a1f] space-y-2 border-t border-[#2e3440]">
+            {/* Playlist Info & Quick Switch Toolbar */}
+            <div className="flex items-center justify-between gap-1 text-[9.5px] pb-0.5 border-b border-[#2e3440]">
+              <div className="flex items-center gap-1 truncate text-yellow-300">
+                <ListMusic size={11} className="shrink-0" />
+                <span className="truncate font-bold">{activePlaylist.title}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  playMouseClick();
+                  setIsAddPlaylistModalOpen(true);
+                }}
+                className="px-1.5 py-0.5 bg-[#2e3440] hover:bg-[#434c5e] text-yellow-300 border border-yellow-700/60 rounded-xs flex items-center gap-1 text-[9px] font-bold cursor-pointer shrink-0"
+                title="Manage / Add Playlists"
+              >
+                <Plus size={9} />
+                <span>+ ADD PL</span>
+              </button>
+            </div>
+
+            {/* Quick Playlist Switcher (if multiple exist) */}
+            {playlists.length > 1 && (
+              <div className="flex items-center gap-1 text-[9px] text-gray-400">
+                <span>PL:</span>
+                <select
+                  value={playlistId}
+                  onChange={(e) => {
+                    playMouseClick();
+                    loadPlaylist(e.target.value);
+                  }}
+                  className="flex-1 bg-black text-[#00ff66] border border-[#3b4252] rounded-xs px-1 py-0.5 font-mono text-[9px] focus:outline-hidden"
+                >
+                  {playlists.map((pl) => (
+                    <option key={pl.id} value={pl.id}>
+                      {pl.title} {pl.isCustom ? '(Custom)' : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
             {/* Track Info Card */}
             <div className="flex items-center gap-2 bg-[#0e1013] p-1.5 rounded-xs border border-[#2e3440]">
               {currentTrack?.thumbnailUrl && (
@@ -77,9 +162,12 @@ export const MusicPlayerDock: React.FC = () => {
                 <div className="text-gray-400 text-[9.5px] truncate">
                   {currentTrack ? currentTrack.artist : 'YouTube Playlist Stream'}
                 </div>
-                <div className="text-[8.5px] text-blue-400 flex items-center gap-1 mt-0.5">
-                  <Youtube size={10} />
-                  <span>Track {currentTrackIndex + 1} of {tracks.length}</span>
+                <div className="text-[8.5px] text-blue-400 flex items-center justify-between mt-0.5">
+                  <div className="flex items-center gap-1">
+                    <Youtube size={10} />
+                    <span>Track {currentTrackIndex + 1} of {tracks.length}</span>
+                  </div>
+                  <span className="text-gray-500 font-mono">[SPACE] Toggle</span>
                 </div>
               </div>
             </div>
@@ -119,7 +207,7 @@ export const MusicPlayerDock: React.FC = () => {
                   className={`p-1.5 ${
                     isPlaying ? 'bg-green-600 hover:bg-green-500' : 'bg-[#2e3440] hover:bg-[#434c5e]'
                   } border border-gray-600 rounded-xs text-white cursor-pointer`}
-                  title={isPlaying ? 'Pause' : 'Play'}
+                  title={isPlaying ? 'Pause (Space)' : 'Play (Space)'}
                 >
                   {isPlaying ? <Pause size={11} /> : <Play size={11} />}
                 </button>

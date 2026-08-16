@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { Analytics } from '@vercel/analytics/react';
 import { WindowInstance, AppId, StickyNote, FileItem } from './types';
 import { CrtEffects } from './components/CrtEffects';
 import { Taskbar } from './components/Taskbar';
@@ -22,6 +21,7 @@ import { PaintApp } from './components/apps/PaintApp';
 import { StickyNoteApp } from './components/apps/StickyNoteApp';
 import { PlaylistProvider } from './components/PlaylistProvider';
 import { MusicPlayerDock } from './components/MusicPlayerDock';
+import { PlaylistManagerModal } from './components/PlaylistManagerModal';
 
 import {
   playMouseClick,
@@ -236,6 +236,13 @@ export default function App() {
     document.addEventListener('contextmenu', handleContextMenu, { capture: true });
 
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Escape or Alt+F4 -> Close active window
+      if ((e.key === 'Escape' || (e.altKey && e.key === 'F4')) && activeWindowId) {
+        e.preventDefault();
+        closeWindow(activeWindowId);
+        return;
+      }
+
       // D key -> Degauss
       if (e.key === 'd' || e.key === 'D') {
         if ((e.target as HTMLElement).tagName !== 'INPUT' && (e.target as HTMLElement).tagName !== 'TEXTAREA') {
@@ -408,6 +415,15 @@ export default function App() {
         <div
           id="desktop-surface"
           className="absolute inset-0 w-full h-full pb-[30px]"
+          onDoubleClick={(e) => {
+            if ((e.target as HTMLElement).id === 'desktop-surface') {
+              if (document.fullscreenElement) {
+                document.exitFullscreen().catch(() => {});
+              } else {
+                document.documentElement.requestFullscreen().catch(() => {});
+              }
+            }
+          }}
           style={{
             backgroundImage: `
               linear-gradient(180deg, rgba(20, 60, 130, 0.4) 0%, rgba(30, 90, 180, 0.2) 40%, rgba(34, 110, 60, 0.3) 70%, rgba(15, 60, 30, 0.6) 100%),
@@ -588,6 +604,9 @@ export default function App() {
         {/* Music Player YouTube Stream Dock */}
         <MusicPlayerDock />
 
+        {/* Playlist Manager Modal (Winamp & YouTube Stream) */}
+        <PlaylistManagerModal />
+
         {/* 6. Authentic Windows XP Taskbar */}
         <Taskbar
           windows={windows}
@@ -612,7 +631,6 @@ export default function App() {
           />
         )}
       </div>
-      <Analytics />
     </PlaylistProvider>
   );
 }

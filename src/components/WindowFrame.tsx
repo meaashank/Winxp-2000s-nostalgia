@@ -122,7 +122,7 @@ export const WindowFrame: React.FC<WindowFrameProps> = ({
         </div>
 
         {/* Right side: XP Minimize / Maximize / Close Buttons */}
-        <div className="flex items-center gap-1 shrink-0">
+        <div className="flex items-center gap-1 shrink-0 ml-2">
           {/* Minimize */}
           <button
             type="button"
@@ -131,10 +131,11 @@ export const WindowFrame: React.FC<WindowFrameProps> = ({
               playMouseClick();
               onMinimize();
             }}
-            className="w-[21px] h-[21px] rounded-[3px] bg-[#0055ea] hover:brightness-110 active:brightness-90 border border-white/60 shadow-[inset_0_1px_1px_rgba(255,255,255,0.8)] flex items-center justify-center cursor-pointer text-white"
+            className="w-[22px] h-[22px] rounded-[3px] bg-gradient-to-b from-[#2b72ee] via-[#0055ea] to-[#0038a8] hover:brightness-120 active:brightness-85 border border-white/70 shadow-[inset_0_1px_1px_rgba(255,255,255,0.9),0_1px_2px_rgba(0,0,0,0.3)] flex items-center justify-center cursor-pointer text-white"
             title="Minimize"
+            aria-label="Minimize"
           >
-            <Minus size={11} strokeWidth={3} className="mt-1" />
+            <Minus size={11} strokeWidth={3.5} className="mt-1" />
           </button>
 
           {/* Maximize / Restore */}
@@ -145,13 +146,14 @@ export const WindowFrame: React.FC<WindowFrameProps> = ({
               playMouseClick();
               onMaximize();
             }}
-            className="w-[21px] h-[21px] rounded-[3px] bg-[#0055ea] hover:brightness-110 active:brightness-90 border border-white/60 shadow-[inset_0_1px_1px_rgba(255,255,255,0.8)] flex items-center justify-center cursor-pointer text-white"
+            className="w-[22px] h-[22px] rounded-[3px] bg-gradient-to-b from-[#2b72ee] via-[#0055ea] to-[#0038a8] hover:brightness-120 active:brightness-85 border border-white/70 shadow-[inset_0_1px_1px_rgba(255,255,255,0.9),0_1px_2px_rgba(0,0,0,0.3)] flex items-center justify-center cursor-pointer text-white"
             title={instance.isMaximized ? 'Restore' : 'Maximize'}
+            aria-label={instance.isMaximized ? 'Restore' : 'Maximize'}
           >
-            <Square size={10} strokeWidth={2.5} />
+            <Square size={10} strokeWidth={2.8} />
           </button>
 
-          {/* Close Button (Red XP button) */}
+          {/* Close Button (Iconic Red Windows XP Cross Button) */}
           <button
             type="button"
             onClick={(e) => {
@@ -159,10 +161,11 @@ export const WindowFrame: React.FC<WindowFrameProps> = ({
               playMouseClick();
               onClose();
             }}
-            className="w-[21px] h-[21px] rounded-[3px] bg-[#e81123] hover:bg-[#f23b49] active:bg-[#bf0e1c] border border-white/60 shadow-[inset_0_1px_1px_rgba(255,255,255,0.8)] flex items-center justify-center cursor-pointer text-white"
-            title="Close"
+            className="w-[22px] h-[22px] rounded-[3px] bg-gradient-to-b from-[#f25d59] via-[#e81123] to-[#b30e1b] hover:from-[#ff6e6a] hover:via-[#ff2235] hover:to-[#cc1120] active:brightness-75 border border-white/80 shadow-[inset_0_1px_1px_rgba(255,255,255,0.9),0_1px_3px_rgba(0,0,0,0.4)] flex items-center justify-center cursor-pointer text-white font-bold transition-all"
+            title="Close (Alt+F4)"
+            aria-label="Close"
           >
-            <X size={12} strokeWidth={3} />
+            <X size={13} strokeWidth={3.2} className="drop-shadow-xs" />
           </button>
         </div>
       </div>

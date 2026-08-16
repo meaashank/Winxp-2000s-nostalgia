@@ -40,8 +40,11 @@ An authentic, tactile, late-night American cyber café / LAN center terminal rec
 - **AOL Instant Messenger (AIM)**:
   - Active buddy list (*xXSarahXx*, *HaloMaster*, *sk8rboi2004*, *CyberSamurai*).
   - Real-time chat with simulated typing indicators, banter, and **BUZZ** feature (Press **`B`**).
-- **Internet Explorer 6.0**:
-  - Historical archive simulations: Google (2004), MySpace (with Top 8 profile & music player), GeoCities Cyber Den, Newgrounds, Neopets, Hotmail, MapQuest, and eBay.
+- **Internet Explorer 6.0 (Live & Vintage Browsing Engine)**:
+  - **Live Web Browsing**: Type any real web address (e.g. `en.wikipedia.org`, `wiby.me`, `news.ycombinator.com`) to browse live websites directly inside the authentic 2004 IE6 chrome via stripped proxy streaming.
+  - **Live Web Search in Google (2004)**: Real-time search index integration querying live encyclopedic and retro web results with clickable links and sub-second response times.
+  - **Full 2004 Period Archive Portals**: MySpace (with profile music player & Top 8), GeoCities Cyber Den, Newgrounds Flash Portal, Neopets, MSN Hotmail webmail, MapQuest driving directions, and eBay.
+  - **Complete Browser Navigation**: Green Luna Back/Forward buttons, address bar auto-sync, link interception, F5 Refresh, Esc Stop, Home, Favorites, and spinning Windows globe throbber.
 - **LimeWire PRO 4.10**:
   - Gnutella P2P network search and transfers running at realistic dial-up/DSL speeds with 99% download stalls.
 - **LAN Gaming & Utilities**:
@@ -54,7 +57,10 @@ An authentic, tactile, late-night American cyber café / LAN center terminal rec
 
 | Shortcut | Action |
 | :--- | :--- |
-| **`Enter`** / **`Space`** | Power on CRT terminal / Boot terminal |
+| **`Double Click (Empty Desktop)`** | Toggle browser fullscreen mode (`document.documentElement.requestFullscreen()`) |
+| **`Space`** | Toggle Play / Pause YouTube & Winamp in sync (when not typing) |
+| **`Enter`** / **`Space`** | Power on CRT terminal / Boot terminal (on boot screen) |
+| **`Esc`** / **`Alt + F4`** | Close active window |
 | **`D`** | Trigger CRT Hardware Degauss (Demagnetize tube) |
 | **`B`** | Send AIM Buddy Buzz (Screen shake + sound) |
 | **`IDDQD`** | Secret LAN Easter Egg |
