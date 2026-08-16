@@ -17,10 +17,14 @@ import {
   Mail,
   ExternalLink,
   Loader2,
+  BookOpen,
+  Compass,
+  Sparkles,
+  TrendingUp,
+  History,
 } from 'lucide-react';
 
 type VintagePortal =
-  | 'google'
   | 'myspace'
   | 'geocities'
   | 'newgrounds'
@@ -33,31 +37,65 @@ interface SearchResult {
   title: string;
   url: string;
   snippet: string;
+  source?: string;
+}
+
+interface LiveFeedItem {
+  title: string;
+  url: string;
+  category: string;
+  source: string;
 }
 
 export const InternetExplorerApp: React.FC = () => {
-  const [currentUrl, setCurrentUrl] = useState('http://www.google.com');
-  const [inputUrl, setInputUrl] = useState('http://www.google.com');
-  const [browserMode, setBrowserMode] = useState<'vintage' | 'live'>('vintage');
-  const [activeVintageTab, setActiveVintageTab] = useState<VintagePortal>('google');
+  const [browserMode, setBrowserMode] = useState<'home' | 'live' | 'vintage'>('home');
+  const [currentUrl, setCurrentUrl] = useState('http://home.msn.com');
+  const [inputUrl, setInputUrl] = useState('http://home.msn.com');
+  const [activeVintageTab, setActiveVintageTab] = useState<VintagePortal>('myspace');
   const [liveProxyUrl, setLiveProxyUrl] = useState('');
-  const [pageTitle, setPageTitle] = useState('Google - Microsoft Internet Explorer');
+  const [isReaderMode, setIsReaderMode] = useState(false);
+  const [pageTitle, setPageTitle] = useState('MSN.com — Microsoft Internet Explorer');
   const [statusText, setStatusText] = useState('Done');
   const [isLoading, setIsLoading] = useState(false);
 
-  // Search state for Google 2004
+  // Search state
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
 
+  // Live feed state
+  const [liveFeed, setLiveFeed] = useState<LiveFeedItem[]>([]);
+  const [isLoadingFeed, setIsLoadingFeed] = useState(false);
+
   // Browser History
   const [history, setHistory] = useState<
-    Array<{ url: string; mode: 'vintage' | 'live'; vintageTab?: VintagePortal; title: string }>
-  >([{ url: 'http://www.google.com', mode: 'vintage', vintageTab: 'google', title: 'Google' }]);
+    Array<{ url: string; mode: 'home' | 'live' | 'vintage'; vintageTab?: VintagePortal; title: string }>
+  >([{ url: 'http://home.msn.com', mode: 'home', title: 'MSN Home' }]);
   const [historyIdx, setHistoryIdx] = useState(0);
 
   const iframeRef = useRef<HTMLIFrameElement>(null);
+
+  // Fetch live trending feeds on startup
+  useEffect(() => {
+    const fetchLiveFeed = async () => {
+      setIsLoadingFeed(true);
+      try {
+        const res = await fetch('/api/live-feed');
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data.items)) {
+            setLiveFeed(data.items);
+          }
+        }
+      } catch (err) {
+        console.warn('Failed to load live feed:', err);
+      } finally {
+        setIsLoadingFeed(false);
+      }
+    };
+    fetchLiveFeed();
+  }, []);
 
   // Listen for iframe link navigation messages
   useEffect(() => {
@@ -73,7 +111,7 @@ export const InternetExplorerApp: React.FC = () => {
 
   const pushHistory = (item: {
     url: string;
-    mode: 'vintage' | 'live';
+    mode: 'home' | 'live' | 'vintage';
     vintageTab?: VintagePortal;
     title: string;
   }) => {
@@ -83,55 +121,23 @@ export const InternetExplorerApp: React.FC = () => {
     setHistoryIdx(nextHist.length - 1);
   };
 
-  const navigateToVintage = (tab: VintagePortal, customUrl?: string) => {
+  const navigateToHome = () => {
     playMouseClick();
     playHddSeek();
     setIsLoading(true);
-    setStatusText('Opening page...');
-
-    const urlMap: Record<VintagePortal, string> = {
-      google: 'http://www.google.com',
-      myspace: 'http://www.myspace.com/xXemo_rawrXx',
-      geocities: 'http://www.geocities.com/cyber_den_2004',
-      newgrounds: 'http://www.newgrounds.com',
-      neopets: 'http://www.neopets.com/petlookup.phtml',
-      hotmail: 'http://mail.hotmail.com/inbox',
-      mapquest: 'http://www.mapquest.com/directions',
-      ebay: 'http://www.ebay.com',
-    };
-
-    const titleMap: Record<VintagePortal, string> = {
-      google: 'Google',
-      myspace: 'MySpace.com - a place for friends',
-      geocities: 'The Cyber Den 2004 - GeoCities',
-      newgrounds: 'Newgrounds.com — Everything, By Everyone',
-      neopets: 'Neopets - Virtual Pet Community',
-      hotmail: 'MSN Hotmail - Inbox',
-      mapquest: 'MapQuest Maps - Driving Directions',
-      ebay: 'eBay - The World\'s Online Marketplace',
-    };
-
-    const targetUrl = customUrl || urlMap[tab];
-    setCurrentUrl(targetUrl);
-    setInputUrl(targetUrl);
-    setBrowserMode('vintage');
-    setActiveVintageTab(tab);
-    setPageTitle(`${titleMap[tab]} - Microsoft Internet Explorer`);
-
-    pushHistory({
-      url: targetUrl,
-      mode: 'vintage',
-      vintageTab: tab,
-      title: titleMap[tab],
-    });
-
+    setStatusText('Opening MSN Home...');
+    setCurrentUrl('http://home.msn.com');
+    setInputUrl('http://home.msn.com');
+    setBrowserMode('home');
+    setPageTitle('MSN.com — Microsoft Internet Explorer');
+    pushHistory({ url: 'http://home.msn.com', mode: 'home', title: 'MSN Home' });
     setTimeout(() => {
       setIsLoading(false);
       setStatusText('Done');
-    }, 450);
+    }, 300);
   };
 
-  const navigateToLiveUrl = (rawUrl: string, addToHistory = true) => {
+  const navigateToLiveUrl = (rawUrl: string, addToHistory = true, useReader = false) => {
     playMouseClick();
     playHddSeek();
     setIsLoading(true);
@@ -145,8 +151,14 @@ export const InternetExplorerApp: React.FC = () => {
     setCurrentUrl(formattedUrl);
     setInputUrl(formattedUrl);
     setBrowserMode('live');
-    setLiveProxyUrl(`/api/proxy?url=${encodeURIComponent(formattedUrl)}`);
-    setPageTitle(`${formattedUrl} - Microsoft Internet Explorer`);
+    setIsReaderMode(useReader);
+
+    const proxyEndpoint = useReader
+      ? `/api/reader?url=${encodeURIComponent(formattedUrl)}`
+      : `/api/proxy?url=${encodeURIComponent(formattedUrl)}`;
+
+    setLiveProxyUrl(proxyEndpoint);
+    setPageTitle(`${formattedUrl} — Microsoft Internet Explorer`);
 
     if (addToHistory) {
       pushHistory({
@@ -158,7 +170,53 @@ export const InternetExplorerApp: React.FC = () => {
 
     setTimeout(() => {
       setStatusText('Downloading page elements...');
-    }, 500);
+    }, 400);
+  };
+
+  const navigateToVintage = (tab: VintagePortal) => {
+    playMouseClick();
+    playHddSeek();
+    setIsLoading(true);
+    setStatusText('Opening vintage archive...');
+
+    const urlMap: Record<VintagePortal, string> = {
+      myspace: 'http://www.myspace.com/xXemo_rawrXx',
+      geocities: 'http://www.geocities.com/cyber_den_2004',
+      newgrounds: 'http://www.newgrounds.com',
+      neopets: 'http://www.neopets.com/petlookup.phtml',
+      hotmail: 'http://mail.hotmail.com/inbox',
+      mapquest: 'http://www.mapquest.com/directions',
+      ebay: 'http://www.ebay.com',
+    };
+
+    const titleMap: Record<VintagePortal, string> = {
+      myspace: 'MySpace.com — a place for friends',
+      geocities: 'The Cyber Den 2004 — GeoCities',
+      newgrounds: 'Newgrounds.com — Everything, By Everyone',
+      neopets: 'Neopets — Virtual Pet Community',
+      hotmail: 'MSN Hotmail — Inbox',
+      mapquest: 'MapQuest Maps — Driving Directions',
+      ebay: "eBay — The World's Online Marketplace",
+    };
+
+    const targetUrl = urlMap[tab];
+    setCurrentUrl(targetUrl);
+    setInputUrl(targetUrl);
+    setBrowserMode('vintage');
+    setActiveVintageTab(tab);
+    setPageTitle(`${titleMap[tab]} — Microsoft Internet Explorer`);
+
+    pushHistory({
+      url: targetUrl,
+      mode: 'vintage',
+      vintageTab: tab,
+      title: titleMap[tab],
+    });
+
+    setTimeout(() => {
+      setIsLoading(false);
+      setStatusText('Done');
+    }, 350);
   };
 
   const handleUrlSubmit = (e: React.FormEvent) => {
@@ -168,23 +226,21 @@ export const InternetExplorerApp: React.FC = () => {
 
     const lower = query.toLowerCase();
 
-    // Check for vintage presets
-    if (lower.includes('myspace')) {
+    // Check for vintage portal shortcuts
+    if (lower === 'myspace' || lower.includes('myspace.com')) {
       navigateToVintage('myspace');
-    } else if (lower.includes('geocities')) {
+    } else if (lower === 'geocities' || lower.includes('geocities.com')) {
       navigateToVintage('geocities');
-    } else if (lower.includes('newgrounds')) {
+    } else if (lower === 'newgrounds' || lower.includes('newgrounds.com')) {
       navigateToVintage('newgrounds');
-    } else if (lower.includes('neopets')) {
+    } else if (lower === 'neopets' || lower.includes('neopets.com')) {
       navigateToVintage('neopets');
-    } else if (lower.includes('hotmail') || lower.includes('mail.msn')) {
+    } else if (lower === 'hotmail' || lower.includes('hotmail.com')) {
       navigateToVintage('hotmail');
-    } else if (lower.includes('mapquest')) {
+    } else if (lower === 'mapquest' || lower.includes('mapquest.com')) {
       navigateToVintage('mapquest');
-    } else if (lower.includes('ebay')) {
+    } else if (lower === 'ebay' || lower.includes('ebay.com')) {
       navigateToVintage('ebay');
-    } else if (lower === 'http://www.google.com' || lower === 'google.com' || lower === 'www.google.com' || lower === 'http://google.com') {
-      navigateToVintage('google');
     } else if (
       lower.startsWith('http://') ||
       lower.startsWith('https://') ||
@@ -195,13 +251,15 @@ export const InternetExplorerApp: React.FC = () => {
       lower.includes('.edu') ||
       lower.includes('.gov') ||
       lower.includes('.me') ||
+      lower.includes('.co') ||
+      lower.includes('.info') ||
       lower.includes('localhost')
     ) {
       // Direct live website navigation!
       navigateToLiveUrl(query);
     } else {
-      // Query entered in address bar -> Run live search on 2004 Google!
-      navigateToVintage('google');
+      // Search query entered in address bar -> Run live multi-engine search!
+      setBrowserMode('home');
       setSearchQuery(query);
       performSearch(query);
     }
@@ -213,7 +271,7 @@ export const InternetExplorerApp: React.FC = () => {
     playMouseClick();
     setIsSearching(true);
     setHasSearched(true);
-    setStatusText('Searching indexed web pages...');
+    setStatusText(`Searching web index for "${queryText}"...`);
 
     try {
       const res = await fetch(`/api/search?q=${encodeURIComponent(queryText)}`);
@@ -227,9 +285,10 @@ export const InternetExplorerApp: React.FC = () => {
       console.warn('Search failed', err);
       setSearchResults([
         {
-          title: `${queryText} - Wikipedia`,
+          title: `${queryText} — Wikipedia`,
           url: `https://en.wikipedia.org/wiki/Special:Search?search=${encodeURIComponent(queryText)}`,
-          snippet: `Search encyclopedic knowledge on Wikipedia for "${queryText}".`,
+          snippet: `Search real-time encyclopedic entries and articles for "${queryText}".`,
+          source: 'Wikipedia',
         },
       ]);
     } finally {
@@ -247,12 +306,12 @@ export const InternetExplorerApp: React.FC = () => {
       setHistoryIdx(prevIdx);
       setCurrentUrl(target.url);
       setInputUrl(target.url);
-      setPageTitle(`${target.title} - Microsoft Internet Explorer`);
+      setPageTitle(`${target.title} — Microsoft Internet Explorer`);
       setBrowserMode(target.mode);
 
       if (target.mode === 'vintage' && target.vintageTab) {
         setActiveVintageTab(target.vintageTab);
-      } else {
+      } else if (target.mode === 'live') {
         setLiveProxyUrl(`/api/proxy?url=${encodeURIComponent(target.url)}`);
       }
     }
@@ -267,12 +326,12 @@ export const InternetExplorerApp: React.FC = () => {
       setHistoryIdx(nextIdx);
       setCurrentUrl(target.url);
       setInputUrl(target.url);
-      setPageTitle(`${target.title} - Microsoft Internet Explorer`);
+      setPageTitle(`${target.title} — Microsoft Internet Explorer`);
       setBrowserMode(target.mode);
 
       if (target.mode === 'vintage' && target.vintageTab) {
         setActiveVintageTab(target.vintageTab);
-      } else {
+      } else if (target.mode === 'live') {
         setLiveProxyUrl(`/api/proxy?url=${encodeURIComponent(target.url)}`);
       }
     }
@@ -284,28 +343,76 @@ export const InternetExplorerApp: React.FC = () => {
     setStatusText('Refreshing page...');
 
     if (browserMode === 'live' && iframeRef.current) {
-      iframeRef.current.src = `/api/proxy?url=${encodeURIComponent(currentUrl)}&t=${Date.now()}`;
+      const currentEndpoint = isReaderMode ? '/api/reader' : '/api/proxy';
+      iframeRef.current.src = `${currentEndpoint}?url=${encodeURIComponent(currentUrl)}&t=${Date.now()}`;
     }
 
     setTimeout(() => {
       setIsLoading(false);
       setStatusText('Done');
-    }, 600);
+    }, 500);
+  };
+
+  const toggleReaderMode = () => {
+    const nextState = !isReaderMode;
+    setIsReaderMode(nextState);
+    if (browserMode === 'live') {
+      const nextEndpoint = nextState ? '/api/reader' : '/api/proxy';
+      setLiveProxyUrl(`${nextEndpoint}?url=${encodeURIComponent(currentUrl)}`);
+    }
   };
 
   return (
     <div className="w-full h-full flex flex-col bg-[#ece9d8] text-[#111] font-tahoma text-[11px] select-text">
       {/* 1. Menu Bar */}
-      <div className="bg-[#ece9d8] px-2 py-0.5 border-b border-[#d4d0c8] flex items-center gap-3 text-[11px] select-none">
-        <span className="hover:bg-[#316ac5] hover:text-white px-1 cursor-pointer">File</span>
-        <span className="hover:bg-[#316ac5] hover:text-white px-1 cursor-pointer">Edit</span>
-        <span className="hover:bg-[#316ac5] hover:text-white px-1 cursor-pointer">View</span>
-        <span className="hover:bg-[#316ac5] hover:text-white px-1 cursor-pointer">Favorites</span>
-        <span className="hover:bg-[#316ac5] hover:text-white px-1 cursor-pointer">Tools</span>
-        <span className="hover:bg-[#316ac5] hover:text-white px-1 cursor-pointer">Help</span>
+      <div className="bg-[#ece9d8] px-2 py-0.5 border-b border-[#d4d0c8] flex items-center justify-between text-[11px] select-none">
+        <div className="flex items-center gap-3">
+          <span className="hover:bg-[#316ac5] hover:text-white px-1 cursor-pointer">File</span>
+          <span className="hover:bg-[#316ac5] hover:text-white px-1 cursor-pointer">Edit</span>
+          <span className="hover:bg-[#316ac5] hover:text-white px-1 cursor-pointer">View</span>
+          <span className="hover:bg-[#316ac5] hover:text-white px-1 cursor-pointer">Favorites</span>
+          <span className="hover:bg-[#316ac5] hover:text-white px-1 cursor-pointer">Tools</span>
+          <span className="hover:bg-[#316ac5] hover:text-white px-1 cursor-pointer">Help</span>
+        </div>
+
+        {/* Mode Selector Tabs in the Menu Row */}
+        <div className="flex items-center gap-1 text-[10px]">
+          <button
+            type="button"
+            onClick={() => {
+              playMouseClick();
+              if (browserMode === 'vintage') {
+                navigateToHome();
+              }
+            }}
+            className={`px-2 py-0.5 rounded-xs border cursor-pointer flex items-center gap-1 font-bold ${
+              browserMode !== 'vintage'
+                ? 'bg-[#003399] text-white border-[#002266]'
+                : 'bg-[#dcd8c8] hover:bg-white text-gray-800 border-gray-400'
+            }`}
+          >
+            <Globe size={11} />
+            <span>Live Web Engine</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              playMouseClick();
+              navigateToVintage('myspace');
+            }}
+            className={`px-2 py-0.5 rounded-xs border cursor-pointer flex items-center gap-1 font-bold ${
+              browserMode === 'vintage'
+                ? 'bg-[#990033] text-white border-[#660022]'
+                : 'bg-[#dcd8c8] hover:bg-white text-gray-800 border-gray-400'
+            }`}
+          >
+            <Sparkles size={11} className="text-yellow-300" />
+            <span>2004 Time Capsule</span>
+          </button>
+        </div>
       </div>
 
-      {/* 2. Classic IE6 Large Toolbar */}
+      {/* 2. Classic IE6 Large Navigation Toolbar */}
       <div className="bg-[#ece9d8] px-2 py-1 border-b border-[#d4d0c8] flex items-center justify-between gap-1 select-none">
         <div className="flex items-center gap-1">
           {/* Back */}
@@ -314,6 +421,7 @@ export const InternetExplorerApp: React.FC = () => {
             disabled={historyIdx <= 0}
             onClick={handleBack}
             className="flex items-center gap-1 px-1.5 py-0.5 border border-transparent hover:border-[#808080] active:border-white rounded-xs disabled:opacity-40 cursor-pointer"
+            title="Back (Alt + Left Arrow)"
           >
             <div className="w-5 h-5 rounded-full bg-gradient-to-b from-[#8fd35f] to-[#458b1b] flex items-center justify-center text-white shadow-xs">
               <ArrowLeft size={12} strokeWidth={3} />
@@ -327,6 +435,7 @@ export const InternetExplorerApp: React.FC = () => {
             disabled={historyIdx >= history.length - 1}
             onClick={handleForward}
             className="flex items-center gap-1 px-1.5 py-0.5 border border-transparent hover:border-[#808080] active:border-white rounded-xs disabled:opacity-40 cursor-pointer"
+            title="Forward (Alt + Right Arrow)"
           >
             <div className="w-5 h-5 rounded-full bg-gradient-to-b from-[#8fd35f] to-[#458b1b] flex items-center justify-center text-white shadow-xs">
               <ArrowRight size={12} strokeWidth={3} />
@@ -344,9 +453,10 @@ export const InternetExplorerApp: React.FC = () => {
               setStatusText('Done');
             }}
             className="p-1 hover:border border-[#808080] rounded-xs cursor-pointer flex items-center gap-1"
-            title="Stop loading (Esc)"
+            title="Stop (Esc)"
           >
             <X size={14} className="text-red-600" />
+            <span>Stop</span>
           </button>
 
           {/* Refresh */}
@@ -357,16 +467,18 @@ export const InternetExplorerApp: React.FC = () => {
             title="Refresh (F5)"
           >
             <RotateCw size={14} className={isLoading ? 'animate-spin text-blue-600' : 'text-gray-700'} />
+            <span>Refresh</span>
           </button>
 
           {/* Home */}
           <button
             type="button"
-            onClick={() => navigateToVintage('google')}
+            onClick={navigateToHome}
             className="p-1 hover:border border-[#808080] rounded-xs cursor-pointer flex items-center gap-1"
-            title="Home"
+            title="MSN / Home Portal"
           >
             <Home size={14} className="text-amber-700" />
+            <span>Home</span>
           </button>
 
           <span className="h-5 border-r border-[#d4d0c8] mx-1" />
@@ -375,7 +487,7 @@ export const InternetExplorerApp: React.FC = () => {
           <button
             type="button"
             onClick={() => {
-              navigateToVintage('google');
+              setBrowserMode('home');
             }}
             className="flex items-center gap-1 px-1.5 py-0.5 hover:border border-[#808080] rounded-xs cursor-pointer"
           >
@@ -386,7 +498,7 @@ export const InternetExplorerApp: React.FC = () => {
           {/* Favorites */}
           <button
             type="button"
-            onClick={() => navigateToVintage('geocities')}
+            onClick={() => navigateToLiveUrl('https://en.wikipedia.org')}
             className="flex items-center gap-1 px-1.5 py-0.5 hover:border border-[#808080] rounded-xs cursor-pointer"
           >
             <Star size={13} className="text-amber-500 fill-amber-400" />
@@ -410,15 +522,18 @@ export const InternetExplorerApp: React.FC = () => {
         </div>
       </div>
 
-      {/* 3. Address Bar */}
-      <form onSubmit={handleUrlSubmit} className="bg-[#ece9d8] px-2 py-1 border-b border-[#7f9db9] flex items-center gap-2 select-none">
+      {/* 3. Address Bar with Go Action */}
+      <form
+        onSubmit={handleUrlSubmit}
+        className="bg-[#ece9d8] px-2 py-1 border-b border-[#7f9db9] flex items-center gap-2 select-none"
+      >
         <span className="text-gray-600 text-[10.5px] font-semibold">Address</span>
         <div className="flex-1 bg-white border border-[#7f9db9] px-2 py-0.5 flex items-center gap-1.5 shadow-inner">
           <Globe size={12} className="text-blue-600 shrink-0" />
           <input
             type="text"
             value={inputUrl}
-            placeholder="Type a web address (e.g. en.wikipedia.org, example.com) or search query..."
+            placeholder="Type any website (e.g. en.wikipedia.org, wiby.me, news.ycombinator.com) or search query..."
             onChange={(e) => setInputUrl(e.target.value)}
             className="w-full bg-transparent border-none outline-none font-tahoma text-[11px] text-[#111]"
           />
@@ -427,34 +542,20 @@ export const InternetExplorerApp: React.FC = () => {
           type="submit"
           className="px-2.5 py-0.5 bg-[#ece9d8] hover:bg-[#dfdbcc] active:bg-[#c8c4b4] border-t border-l border-white border-r border-b border-[#808080] font-bold text-[10.5px] cursor-pointer flex items-center gap-1 text-[#002266]"
         >
-          <span className="text-green-700">➔</span>
+          <span className="text-green-700 font-bold">➔</span>
           <span>Go</span>
         </button>
       </form>
 
-      {/* 4. Quick Bookmark Links Bar with Live & Vintage Destinations */}
+      {/* 4. Live Quick Links / Bookmarks Bar */}
       <div className="bg-[#f0ede0] px-2 py-0.5 border-b border-[#d4d0c8] flex items-center gap-2 overflow-x-auto text-[10px] select-none">
-        <span className="font-bold text-gray-500">Links:</span>
+        <span className="font-bold text-gray-500 shrink-0">Links:</span>
         <button
           type="button"
-          onClick={() => navigateToVintage('google')}
-          className="text-blue-700 hover:underline cursor-pointer flex items-center gap-0.5 shrink-0"
-        >
-          🔍 Google (2004)
-        </button>
-        <button
-          type="button"
-          onClick={() => navigateToLiveUrl('https://en.wikipedia.org/wiki/2004')}
+          onClick={() => navigateToLiveUrl('https://en.wikipedia.org')}
           className="text-blue-700 hover:underline cursor-pointer flex items-center gap-0.5 shrink-0 font-semibold"
         >
           📖 Wikipedia (Live)
-        </button>
-        <button
-          type="button"
-          onClick={() => navigateToLiveUrl('https://wiby.me')}
-          className="text-blue-700 hover:underline cursor-pointer flex items-center gap-0.5 shrink-0"
-        >
-          🌐 Wiby (Retro Web)
         </button>
         <button
           type="button"
@@ -465,79 +566,345 @@ export const InternetExplorerApp: React.FC = () => {
         </button>
         <button
           type="button"
+          onClick={() => navigateToLiveUrl('https://wiby.me')}
+          className="text-blue-700 hover:underline cursor-pointer flex items-center gap-0.5 shrink-0"
+        >
+          🌐 Wiby (Retro Index)
+        </button>
+        <button
+          type="button"
+          onClick={() => navigateToLiveUrl('http://frogfind.com')}
+          className="text-blue-700 hover:underline cursor-pointer flex items-center gap-0.5 shrink-0"
+        >
+          🐸 FrogFind (Light Web)
+        </button>
+        <button
+          type="button"
+          onClick={() => navigateToLiveUrl('https://archive.org')}
+          className="text-blue-700 hover:underline cursor-pointer flex items-center gap-0.5 shrink-0"
+        >
+          📜 Wayback Archive
+        </button>
+        <button
+          type="button"
+          onClick={() => navigateToLiveUrl('https://www.bbc.com')}
+          className="text-blue-700 hover:underline cursor-pointer flex items-center gap-0.5 shrink-0"
+        >
+          🌍 BBC News
+        </button>
+        <button
+          type="button"
           onClick={() => navigateToVintage('myspace')}
-          className="text-blue-700 hover:underline cursor-pointer flex items-center gap-0.5 shrink-0"
+          className="text-purple-700 hover:underline cursor-pointer flex items-center gap-0.5 shrink-0 font-bold ml-auto"
         >
-          🎵 MySpace
-        </button>
-        <button
-          type="button"
-          onClick={() => navigateToVintage('geocities')}
-          className="text-blue-700 hover:underline cursor-pointer flex items-center gap-0.5 shrink-0"
-        >
-          💾 GeoCities
-        </button>
-        <button
-          type="button"
-          onClick={() => navigateToVintage('newgrounds')}
-          className="text-blue-700 hover:underline cursor-pointer flex items-center gap-0.5 shrink-0"
-        >
-          ⚡ Newgrounds
-        </button>
-        <button
-          type="button"
-          onClick={() => navigateToVintage('neopets')}
-          className="text-blue-700 hover:underline cursor-pointer flex items-center gap-0.5 shrink-0"
-        >
-          🐾 Neopets
-        </button>
-        <button
-          type="button"
-          onClick={() => navigateToVintage('mapquest')}
-          className="text-blue-700 hover:underline cursor-pointer flex items-center gap-0.5 shrink-0"
-        >
-          🗺️ MapQuest
-        </button>
-        <button
-          type="button"
-          onClick={() => navigateToVintage('ebay')}
-          className="text-blue-700 hover:underline cursor-pointer flex items-center gap-0.5 shrink-0"
-        >
-          🏷️ eBay
-        </button>
-        <button
-          type="button"
-          onClick={() => navigateToVintage('hotmail')}
-          className="text-blue-700 hover:underline cursor-pointer flex items-center gap-0.5 shrink-0"
-        >
-          📬 Hotmail
+          ⭐ 2004 Portals ➔
         </button>
       </div>
 
-      {/* 5. Browser Page Content Viewport */}
+      {/* 5. Main Browser Viewport */}
       <div className="flex-1 bg-white overflow-hidden relative select-text">
-        {/* MODE A: LIVE PROXY WEB BROWSING (Loads any real website inside 2004 IE6 frame) */}
+        {/* VIEW 1: LIVE HOME PORTAL (MSN / Internet Explorer Home with Real Search & Real Feeds) */}
+        {browserMode === 'home' && (
+          <div className="w-full h-full overflow-y-auto bg-[#f8f9fa] p-4 flex flex-col">
+            {/* Top MSN / Internet Explorer Brand Banner */}
+            <div className="max-w-4xl mx-auto w-full space-y-4">
+              <div className="bg-gradient-to-r from-[#003399] via-[#2055b5] to-[#003399] text-white p-3 rounded-xs flex items-center justify-between shadow-xs">
+                <div className="flex items-center gap-2">
+                  <span className="text-2xl">🌐</span>
+                  <div>
+                    <div className="font-bold text-sm tracking-wide flex items-center gap-1.5">
+                      <span>MSN Internet Explorer Live Portal</span>
+                      <span className="bg-yellow-400 text-black text-[9px] px-1.5 py-0.2 rounded-xs font-mono font-bold">
+                        ONLINE 2004
+                      </span>
+                    </div>
+                    <div className="text-[10px] text-blue-200">
+                      Real-time Live Web Browsing · Multi-Engine Search · Clean Article Reader
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => navigateToLiveUrl('https://en.wikipedia.org/wiki/Portal:Current_events')}
+                    className="px-2 py-1 bg-white/20 hover:bg-white/30 text-white rounded-xs text-[10px] font-bold cursor-pointer"
+                  >
+                    World Events
+                  </button>
+                </div>
+              </div>
+
+              {/* Live Web Search Box */}
+              <div className="bg-white border-2 border-[#7f9db9] p-3.5 rounded-xs shadow-xs">
+                <div className="text-[12px] font-bold text-[#002266] mb-1.5 flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <Search size={14} className="text-blue-600" />
+                    <span>Search the Live Internet:</span>
+                  </div>
+                  <span className="text-[10px] text-gray-500 font-normal">
+                    Queries Wikipedia, DuckDuckGo & Web Indexes
+                  </span>
+                </div>
+
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    performSearch(searchQuery);
+                  }}
+                  className="flex gap-2"
+                >
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    placeholder="Search topics, encyclopedia entries, news, or enter any domain (e.g. apple.com)..."
+                    onChange={(e) => {
+                      playKeyClick();
+                      setSearchQuery(e.target.value);
+                    }}
+                    className="flex-1 border border-[#7f9db9] p-2 text-[12px] outline-none shadow-inner"
+                  />
+                  <button
+                    type="submit"
+                    disabled={isSearching}
+                    className="px-4 py-2 bg-[#003399] hover:bg-[#002266] text-white font-bold text-[11px] rounded-xs cursor-pointer flex items-center gap-1 shadow-xs"
+                  >
+                    {isSearching ? <Loader2 size={13} className="animate-spin" /> : <Search size={13} />}
+                    <span>{isSearching ? 'Searching...' : 'Web Search'}</span>
+                  </button>
+                </form>
+
+                {/* Search Results Display */}
+                {hasSearched && (
+                  <div className="mt-4 pt-3 border-t border-gray-200 space-y-3">
+                    <div className="text-[10.5px] text-gray-600 flex justify-between items-center">
+                      <span>
+                        Live Search Results for: <strong>"{searchQuery}"</strong>
+                      </span>
+                      <span>{searchResults.length} matches found</span>
+                    </div>
+
+                    {isSearching ? (
+                      <div className="py-6 text-center text-gray-600 flex items-center justify-center gap-2">
+                        <Loader2 size={16} className="animate-spin text-blue-600" />
+                        <span>Querying live internet index servers...</span>
+                      </div>
+                    ) : searchResults.length === 0 ? (
+                      <div className="py-4 text-center text-gray-500">
+                        No direct results found. Try entering a specific website URL in the address bar!
+                      </div>
+                    ) : (
+                      <div className="space-y-3 divide-y divide-gray-100">
+                        {searchResults.map((res, idx) => (
+                          <div key={idx} className="pt-2 space-y-0.5">
+                            <div className="flex items-center justify-between">
+                              <button
+                                type="button"
+                                onClick={() => navigateToLiveUrl(res.url)}
+                                className="text-[#0000cc] hover:underline font-bold text-[13px] text-left cursor-pointer"
+                              >
+                                {res.title}
+                              </button>
+                              {res.source && (
+                                <span className="text-[9px] bg-blue-50 text-blue-700 px-1.5 py-0.5 border border-blue-200 rounded-xs font-mono">
+                                  {res.source}
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-gray-700 text-[11.5px] leading-relaxed">{res.snippet}</p>
+                            <div className="text-[#008000] text-[10px] flex items-center gap-2">
+                              <span className="truncate max-w-md">{res.url}</span>
+                              <span className="text-gray-400">·</span>
+                              <button
+                                type="button"
+                                onClick={() => navigateToLiveUrl(res.url)}
+                                className="text-blue-700 hover:underline font-bold cursor-pointer"
+                              >
+                                ➔ Browse Live
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => navigateToLiveUrl(res.url, true, true)}
+                                className="text-amber-800 hover:underline cursor-pointer"
+                              >
+                                📖 Reader Mode
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Live Web Quick Directory Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                {/* 1. Live Encylopedia & Retro Engines */}
+                <div className="bg-white border border-[#d4d0c8] p-3 rounded-xs space-y-2 shadow-xs">
+                  <div className="font-bold text-[11.5px] text-[#002266] border-b border-gray-200 pb-1 flex items-center gap-1.5">
+                    <BookOpen size={13} className="text-blue-600" />
+                    <span>Real Live Encyclopedias</span>
+                  </div>
+                  <div className="space-y-1.5 text-[11px]">
+                    <div
+                      onClick={() => navigateToLiveUrl('https://en.wikipedia.org/wiki/Main_Page')}
+                      className="p-1.5 hover:bg-blue-50 rounded-xs cursor-pointer border border-transparent hover:border-blue-200"
+                    >
+                      <div className="font-bold text-blue-800">Wikipedia Main Portal</div>
+                      <div className="text-[10px] text-gray-500">6,700,000+ free encyclopedia articles</div>
+                    </div>
+                    <div
+                      onClick={() => navigateToLiveUrl('https://wiby.me')}
+                      className="p-1.5 hover:bg-blue-50 rounded-xs cursor-pointer border border-transparent hover:border-blue-200"
+                    >
+                      <div className="font-bold text-blue-800">Wiby Search Engine</div>
+                      <div className="text-[10px] text-gray-500">Classic, indie, and early web search index</div>
+                    </div>
+                    <div
+                      onClick={() => navigateToLiveUrl('http://frogfind.com')}
+                      className="p-1.5 hover:bg-blue-50 rounded-xs cursor-pointer border border-transparent hover:border-blue-200"
+                    >
+                      <div className="font-bold text-blue-800">FrogFind 2004</div>
+                      <div className="text-[10px] text-gray-500">Lightweight text-first browsing for vintage PCs</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 2. Live Tech & News Feed */}
+                <div className="bg-white border border-[#d4d0c8] p-3 rounded-xs space-y-2 shadow-xs">
+                  <div className="font-bold text-[11.5px] text-[#002266] border-b border-gray-200 pb-1 flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <TrendingUp size={13} className="text-green-600" />
+                      <span>Live Tech News</span>
+                    </div>
+                    {isLoadingFeed && <Loader2 size={10} className="animate-spin text-gray-400" />}
+                  </div>
+                  <div className="space-y-1 text-[10.5px]">
+                    {liveFeed.length === 0 && !isLoadingFeed ? (
+                      <div className="text-gray-500 text-[10px] py-2">Loading live feeds...</div>
+                    ) : (
+                      liveFeed.slice(0, 4).map((feed, idx) => (
+                        <div
+                          key={idx}
+                          onClick={() => navigateToLiveUrl(feed.url)}
+                          className="p-1 hover:bg-green-50 rounded-xs cursor-pointer border border-transparent hover:border-green-200 truncate"
+                        >
+                          <div className="text-blue-900 font-semibold truncate hover:underline">
+                            {feed.title}
+                          </div>
+                          <div className="text-[9px] text-gray-500 flex justify-between">
+                            <span>{feed.source}</span>
+                            <span className="text-green-700 font-medium">LIVE</span>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+
+                {/* 3. 2004 Period Portals Time Capsule */}
+                <div className="bg-[#fffdf5] border border-[#d4c890] p-3 rounded-xs space-y-2 shadow-xs">
+                  <div className="font-bold text-[11.5px] text-[#994400] border-b border-[#ebdca0] pb-1 flex items-center gap-1.5">
+                    <Sparkles size={13} className="text-amber-600" />
+                    <span>2004 Vintage Portals</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-1 text-[10px]">
+                    <button
+                      type="button"
+                      onClick={() => navigateToVintage('myspace')}
+                      className="p-1.5 bg-white hover:bg-orange-50 border border-gray-300 rounded-xs text-left cursor-pointer"
+                    >
+                      <div className="font-bold text-orange-700">🎵 MySpace</div>
+                      <div className="text-gray-500 text-[8.5px]">Top 8 friends</div>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => navigateToVintage('geocities')}
+                      className="p-1.5 bg-white hover:bg-blue-50 border border-gray-300 rounded-xs text-left cursor-pointer"
+                    >
+                      <div className="font-bold text-blue-700">💾 GeoCities</div>
+                      <div className="text-gray-500 text-[8.5px]">Cyber Den 2004</div>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => navigateToVintage('newgrounds')}
+                      className="p-1.5 bg-white hover:bg-red-50 border border-gray-300 rounded-xs text-left cursor-pointer"
+                    >
+                      <div className="font-bold text-red-700">⚡ Newgrounds</div>
+                      <div className="text-gray-500 text-[8.5px]">Flash Portal</div>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => navigateToVintage('neopets')}
+                      className="p-1.5 bg-white hover:bg-yellow-50 border border-gray-300 rounded-xs text-left cursor-pointer"
+                    >
+                      <div className="font-bold text-yellow-700">🐾 Neopets</div>
+                      <div className="text-gray-500 text-[8.5px]">Virtual Pets</div>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => navigateToVintage('hotmail')}
+                      className="p-1.5 bg-white hover:bg-blue-50 border border-gray-300 rounded-xs text-left cursor-pointer"
+                    >
+                      <div className="font-bold text-blue-700">📬 Hotmail</div>
+                      <div className="text-gray-500 text-[8.5px]">2004 Inbox</div>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => navigateToVintage('ebay')}
+                      className="p-1.5 bg-white hover:bg-green-50 border border-gray-300 rounded-xs text-left cursor-pointer"
+                    >
+                      <div className="font-bold text-green-700">🏷️ eBay</div>
+                      <div className="text-gray-500 text-[8.5px]">Online Auctions</div>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* VIEW 2: LIVE WEB BROWSING PROXY / READER (Real live internet sites inside 2004 IE6 frame) */}
         {browserMode === 'live' && (
           <div className="w-full h-full flex flex-col bg-white">
-            {/* Live Web Status Overlay Banner */}
-            <div className="bg-[#f9f9f9] border-b border-[#e0e0e0] px-2 py-0.5 text-[10px] text-gray-600 flex items-center justify-between select-none">
-              <span className="flex items-center gap-1">
-                <Globe size={11} className="text-blue-600" />
-                <span className="font-mono">{currentUrl}</span>
-              </span>
+            {/* Live Web Action Header Bar */}
+            <div className="bg-[#f0f4f9] border-b border-[#c8d8ec] px-3 py-1 text-[11px] text-gray-700 flex items-center justify-between select-none">
+              <div className="flex items-center gap-2 truncate max-w-[65%]">
+                <Globe size={13} className="text-blue-600 shrink-0" />
+                <span className="font-mono text-[10.5px] truncate text-[#002266] font-semibold">{currentUrl}</span>
+              </div>
+
               <div className="flex items-center gap-2">
+                {/* Reader View Toggle */}
+                <button
+                  type="button"
+                  onClick={toggleReaderMode}
+                  className={`px-2 py-0.5 rounded-xs border text-[10px] font-medium flex items-center gap-1 cursor-pointer ${
+                    isReaderMode
+                      ? 'bg-[#003399] text-white border-[#002266]'
+                      : 'bg-white hover:bg-gray-100 text-gray-800 border-gray-300'
+                  }`}
+                  title="Toggle Fast Reader Mode"
+                >
+                  <BookOpen size={11} />
+                  <span>{isReaderMode ? 'Reader Active' : 'Reader View'}</span>
+                </button>
+
+                {/* External popout */}
                 <button
                   type="button"
                   onClick={() => window.open(currentUrl, '_blank')}
-                  className="text-blue-700 hover:underline flex items-center gap-0.5 text-[9.5px]"
-                  title="Open in new window"
+                  className="px-2 py-0.5 bg-white hover:bg-gray-100 text-blue-700 border border-gray-300 rounded-xs flex items-center gap-1 text-[10px] cursor-pointer"
+                  title="Open site in new browser tab"
                 >
-                  <ExternalLink size={9} /> Open in new tab
+                  <ExternalLink size={10} />
+                  <span>Popout</span>
                 </button>
               </div>
             </div>
 
-            {/* Live Web Iframe via Stripped / Secure Proxy */}
+            {/* Live Proxy Frame */}
             <iframe
               ref={iframeRef}
               src={liveProxyUrl}
@@ -552,172 +919,34 @@ export const InternetExplorerApp: React.FC = () => {
           </div>
         )}
 
-        {/* MODE B: VINTAGE 2004 PORTALS & GOOGLE 2004 LIVE SEARCH */}
+        {/* VIEW 3: 2004 VINTAGE PORTALS TIME CAPSULE */}
         {browserMode === 'vintage' && (
-          <div className="w-full h-full overflow-y-auto p-4">
-            {/* GOOGLE (2004 Classic Minimalist White with Real Search Index) */}
-            {activeVintageTab === 'google' && (
-              <div className="max-w-xl mx-auto pt-4 flex flex-col items-center text-center">
-                {/* 2004 Logo */}
-                <div
-                  onClick={() => {
-                    setHasSearched(false);
-                    setSearchQuery('');
-                  }}
-                  className="mb-3 cursor-pointer"
+          <div className="w-full h-full overflow-y-auto p-4 bg-[#ece9d8]">
+            {/* Vintage Portals Tab Selector */}
+            <div className="max-w-3xl mx-auto mb-3 flex items-center gap-1 border-b border-[#7f9db9] pb-1 overflow-x-auto text-[10.5px]">
+              {[
+                { id: 'myspace', label: 'MySpace Profile' },
+                { id: 'geocities', label: 'GeoCities WebRing' },
+                { id: 'newgrounds', label: 'Newgrounds Flash' },
+                { id: 'neopets', label: 'Neopets Central' },
+                { id: 'hotmail', label: 'MSN Hotmail' },
+                { id: 'mapquest', label: 'MapQuest' },
+                { id: 'ebay', label: 'eBay 2004' },
+              ].map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => navigateToVintage(tab.id as VintagePortal)}
+                  className={`px-2.5 py-1 border rounded-t-xs cursor-pointer font-semibold ${
+                    activeVintageTab === tab.id
+                      ? 'bg-white text-[#002266] border-[#7f9db9] border-b-white -mb-[2px]'
+                      : 'bg-[#dfdbcc] hover:bg-white text-gray-700 border-gray-400'
+                  }`}
                 >
-                  <span className="text-4xl font-serif font-bold text-[#4285f4]">G</span>
-                  <span className="text-4xl font-serif font-bold text-[#ea4335]">o</span>
-                  <span className="text-4xl font-serif font-bold text-[#fbbc05]">o</span>
-                  <span className="text-4xl font-serif font-bold text-[#4285f4]">g</span>
-                  <span className="text-4xl font-serif font-bold text-[#34a853]">l</span>
-                  <span className="text-4xl font-serif font-bold text-[#ea4335]">e</span>
-                  <span className="text-xs text-gray-500 font-sans ml-1">™</span>
-                </div>
-
-                {/* Links bar */}
-                <div className="flex gap-4 text-[11px] text-blue-800 mb-3 underline">
-                  <span className="cursor-pointer font-bold no-underline text-black">Web</span>
-                  <span
-                    onClick={() => navigateToLiveUrl(`https://en.wikipedia.org/wiki/Special:Search?search=${encodeURIComponent(searchQuery || '2004')}`)}
-                    className="cursor-pointer"
-                  >
-                    Encyclopedia
-                  </span>
-                  <span
-                    onClick={() => navigateToLiveUrl(`https://wiby.me/?q=${encodeURIComponent(searchQuery || 'technology')}`)}
-                    className="cursor-pointer"
-                  >
-                    Retro Web
-                  </span>
-                  <span
-                    onClick={() => navigateToVintage('geocities')}
-                    className="cursor-pointer"
-                  >
-                    WebRing
-                  </span>
-                  <span
-                    onClick={() => navigateToVintage('ebay')}
-                    className="cursor-pointer"
-                  >
-                    Froogle
-                  </span>
-                </div>
-
-                {/* Search Input Box */}
-                <form
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    performSearch(searchQuery);
-                  }}
-                  className="w-full max-w-md flex flex-col items-center"
-                >
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    placeholder="Search 4,285,199,774 live web pages..."
-                    onChange={(e) => {
-                      playKeyClick();
-                      setSearchQuery(e.target.value);
-                    }}
-                    className="w-full border-2 border-[#7f9db9] p-1.5 text-[12px] outline-none shadow-inner"
-                  />
-                  <div className="flex gap-2 mt-3">
-                    <button
-                      type="submit"
-                      disabled={isSearching}
-                      className="px-3 py-1 bg-[#ece9d8] border border-gray-400 text-[11px] hover:border-black active:bg-[#d8d4c4] cursor-pointer font-medium"
-                    >
-                      {isSearching ? 'Searching...' : 'Google Search'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (searchQuery.trim()) {
-                          navigateToLiveUrl(`https://en.wikipedia.org/wiki/${encodeURIComponent(searchQuery.trim().replace(/ /g, '_'))}`);
-                        } else {
-                          navigateToVintage('myspace');
-                        }
-                      }}
-                      className="px-3 py-1 bg-[#ece9d8] border border-gray-400 text-[11px] hover:border-black active:bg-[#d8d4c4] cursor-pointer"
-                    >
-                      I'm Feeling Lucky
-                    </button>
-                  </div>
-                </form>
-
-                {/* Real Live Search Results */}
-                {isSearching && (
-                  <div className="mt-6 flex items-center gap-2 text-gray-600 text-[11.5px]">
-                    <Loader2 size={15} className="animate-spin text-blue-600" />
-                    <span>Querying Google index servers for "{searchQuery}"...</span>
-                  </div>
-                )}
-
-                {hasSearched && !isSearching && (
-                  <div className="mt-5 text-left w-full border-t border-gray-200 pt-3 space-y-4">
-                    <div className="text-[10px] text-gray-500 flex justify-between">
-                      <span>Results for <strong>{searchQuery}</strong></span>
-                      <span>Showing {searchResults.length} matches (0.14 seconds)</span>
-                    </div>
-
-                    {searchResults.length === 0 ? (
-                      <div className="text-gray-600 text-[11.5px] py-4 text-center">
-                        <p>No results found for "<strong>{searchQuery}</strong>".</p>
-                        <p className="text-[10px] text-gray-400 mt-1">Make sure all words are spelled correctly or try more general keywords.</p>
-                      </div>
-                    ) : (
-                      searchResults.map((result, idx) => (
-                        <div key={idx} className="space-y-0.5">
-                          <button
-                            type="button"
-                            onClick={() => navigateToLiveUrl(result.url)}
-                            className="text-[#0000cc] hover:underline font-medium text-[13px] text-left block cursor-pointer"
-                          >
-                            {result.title}
-                          </button>
-                          <p className="text-[#222] text-[11px] leading-snug">
-                            {result.snippet}
-                          </p>
-                          <div className="text-[#008000] text-[10px] flex items-center gap-2">
-                            <span>{result.url}</span>
-                            <span className="text-gray-400">-</span>
-                            <button
-                              type="button"
-                              onClick={() => navigateToLiveUrl(result.url)}
-                              className="text-[#7777cc] hover:underline cursor-pointer"
-                            >
-                              Browse Live
-                            </button>
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                )}
-
-                {!hasSearched && (
-                  <div className="mt-8 grid grid-cols-2 gap-2 text-left w-full border-t border-gray-200 pt-3 text-[10.5px]">
-                    <div className="p-2 bg-[#f8f9fa] border border-gray-200 rounded-xs">
-                      <div className="font-bold text-[#002266] mb-1">💡 Real Web Browsing Available</div>
-                      <p className="text-gray-600">
-                        Type any URL (e.g. <code>en.wikipedia.org</code>, <code>news.ycombinator.com</code>) in the Address Bar to browse the live web within 2004 Internet Explorer!
-                      </p>
-                    </div>
-                    <div className="p-2 bg-[#f8f9fa] border border-gray-200 rounded-xs">
-                      <div className="font-bold text-[#002266] mb-1">⭐ Vintage 2004 Portals</div>
-                      <p className="text-gray-600">
-                        Explore period archives: MySpace Top 8, GeoCities Cyber Den, Newgrounds Flash Portal, Neopets, Hotmail, and eBay.
-                      </p>
-                    </div>
-                  </div>
-                )}
-
-                <div className="mt-10 text-[10px] text-gray-500">
-                  ©2004 Google - Searching 4,285,199,774 web pages
-                </div>
-              </div>
-            )}
+                  {tab.label}
+                </button>
+              ))}
+            </div>
 
             {/* MYSPACE PROFILE */}
             {activeVintageTab === 'myspace' && (
@@ -734,7 +963,7 @@ export const InternetExplorerApp: React.FC = () => {
                     <div className="font-bold text-[14px] text-orange-400">xX_rawr_xD_2004_Xx</div>
                     <div className="text-[10px] text-gray-400">"it's not a phase mom"</div>
 
-                    <div className="my-2 w-full h-40 bg-gradient-to-b from-purple-900 to-black border border-gray-600 flex items-center justify-center text-center p-2 text-[11px]">
+                    <div className="my-2 w-full h-36 bg-gradient-to-b from-purple-900 to-black border border-gray-600 flex items-center justify-center text-center p-2 text-[11px]">
                       📷 [Webcam Self-Portrait with mirror flash]
                     </div>
 
@@ -759,7 +988,7 @@ export const InternetExplorerApp: React.FC = () => {
                         <span className="text-lg">▶️</span>
                         <div>
                           <div className="text-orange-400 font-bold text-[11px]">Evanescence - Bring Me To Life.mp3</div>
-                          <div className="text-[9px] text-gray-400">Autoplaying profile song (buffering 42%)</div>
+                          <div className="text-[9px] text-gray-400">Autoplaying profile song (buffering 100%)</div>
                         </div>
                       </div>
                     </div>
@@ -794,7 +1023,7 @@ export const InternetExplorerApp: React.FC = () => {
                           { name: 'Cabin04 Admin', title: 'cyber cafe' },
                         ].map((friend) => (
                           <div key={friend.name} className="border border-gray-800 p-1 bg-black/40">
-                            <div className="w-full h-12 bg-gray-800 flex items-center justify-center text-[10px]">
+                            <div className="w-full h-10 bg-gray-800 flex items-center justify-center text-[10px]">
                               👤
                             </div>
                             <div className="text-blue-400 font-bold truncate mt-1">{friend.name}</div>
@@ -849,20 +1078,21 @@ export const InternetExplorerApp: React.FC = () => {
                   <span>NEWGROUNDS.COM - EVERYTHING BY EVERYONE</span>
                   <span className="text-xs">Flash Portal 2004</span>
                 </div>
-                <div className="grid grid-cols-2 gap-3 mt-3 text-xs">
-                  <div className="border border-gray-700 p-2 bg-[#222]">
-                    <div className="font-bold text-orange-400 mb-1">🎮 Alien Hominid Flash</div>
-                    <div className="h-24 bg-black flex items-center justify-center text-gray-500">
-                      [Flash 6 Player Embed]
-                    </div>
-                    <div className="text-[10px] text-gray-400 mt-1">Rating: 4.88 / 5 (38,200 votes)</div>
+                <div className="grid grid-cols-3 gap-2 mt-3 text-center text-xs">
+                  <div className="bg-[#282828] p-2 border border-gray-700">
+                    <div className="h-16 bg-[#111] flex items-center justify-center text-2xl">⚡</div>
+                    <div className="font-bold text-orange-400 mt-1">Alien Hominid</div>
+                    <div className="text-[10px] text-gray-400">Score: 4.88 / 5.0</div>
                   </div>
-                  <div className="border border-gray-700 p-2 bg-[#222]">
-                    <div className="font-bold text-orange-400 mb-1">⚔️ Madness Combat 3</div>
-                    <div className="h-24 bg-black flex items-center justify-center text-gray-500">
-                      [Flash Animation by Krinkels]
-                    </div>
-                    <div className="text-[10px] text-gray-400 mt-1">Daily Feature Award</div>
+                  <div className="bg-[#282828] p-2 border border-gray-700">
+                    <div className="h-16 bg-[#111] flex items-center justify-center text-2xl">🎮</div>
+                    <div className="font-bold text-orange-400 mt-1">Pico's School</div>
+                    <div className="text-[10px] text-gray-400">Score: 4.92 / 5.0</div>
+                  </div>
+                  <div className="bg-[#282828] p-2 border border-gray-700">
+                    <div className="h-16 bg-[#111] flex items-center justify-center text-2xl">⚔️</div>
+                    <div className="font-bold text-orange-400 mt-1">Madness Combat</div>
+                    <div className="text-[10px] text-gray-400">Score: 4.95 / 5.0</div>
                   </div>
                 </div>
               </div>
@@ -870,21 +1100,20 @@ export const InternetExplorerApp: React.FC = () => {
 
             {/* NEOPETS */}
             {activeVintageTab === 'neopets' && (
-              <div className="max-w-lg mx-auto bg-[#ffffea] text-[#333] p-4 border border-[#ffd700]">
-                <div className="bg-[#ffcc00] p-2 font-bold text-sm text-[#003399]">
-                  NEOPETS - Virtual Pet Community
+              <div className="max-w-lg mx-auto bg-[#fffbe6] border-2 border-[#f0c040] p-4 text-[#333]">
+                <div className="text-center pb-2 border-b border-[#f0c040]">
+                  <div className="text-2xl font-bold text-[#b07000]">NEOPETS.COM</div>
+                  <div className="text-xs text-gray-600">The Greatest Virtual Pet Site in the Universe!</div>
                 </div>
-                <div className="mt-3 flex items-center gap-4 border border-yellow-300 p-3 bg-white">
-                  <div className="w-24 h-24 bg-blue-100 border border-blue-400 flex items-center justify-center text-4xl">
-                    🐯
+                <div className="mt-3 flex gap-3 items-center bg-white p-3 border border-yellow-300">
+                  <div className="w-20 h-20 bg-yellow-100 border border-yellow-400 rounded-full flex items-center justify-center text-3xl">
+                    🐲
                   </div>
-                  <div className="text-xs space-y-1">
-                    <div className="font-bold text-blue-900 text-sm">Shadow_Kougra_2004</div>
-                    <div><strong>Species:</strong> Kougra</div>
-                    <div><strong>Health:</strong> 14 / 14</div>
-                    <div><strong>Hunger:</strong> Dying (Feed with Giant Omelette!)</div>
-                    <div><strong>Mood:</strong> Delighted</div>
-                    <div><strong>Age:</strong> 412 days</div>
+                  <div>
+                    <div className="font-bold text-sm text-blue-900">Draco_Scorch_2004</div>
+                    <div className="text-xs text-gray-600">Species: Shoyru (Yellow)</div>
+                    <div className="text-xs text-green-700 font-bold">Health: 15 / 15 (Delighted)</div>
+                    <div className="text-xs text-amber-800">Neopoints: 14,820 NP</div>
                   </div>
                 </div>
               </div>
@@ -892,10 +1121,10 @@ export const InternetExplorerApp: React.FC = () => {
 
             {/* HOTMAIL */}
             {activeVintageTab === 'hotmail' && (
-              <div className="max-w-2xl mx-auto bg-white border border-[#7f9db9] text-xs">
-                <div className="bg-[#003399] text-white p-2 flex justify-between items-center font-bold">
-                  <span>MSN Hotmail - Inbox (3 unread)</span>
-                  <span className="text-[10px]">guest_cabin04@hotmail.com</span>
+              <div className="max-w-xl mx-auto bg-white border border-gray-400 shadow-sm">
+                <div className="bg-[#003399] text-white p-2 flex justify-between items-center text-xs">
+                  <span className="font-bold">MSN Hotmail - Inbox (4 unread)</span>
+                  <span>cyber_surfer04@hotmail.com</span>
                 </div>
                 <div className="p-2 border-b border-gray-200 flex gap-3 text-[11px] text-blue-800 bg-[#f0ede0]">
                   <span className="font-bold cursor-pointer">New Message</span> |
@@ -969,14 +1198,19 @@ export const InternetExplorerApp: React.FC = () => {
         )}
       </div>
 
-      {/* 6. Status Bar */}
+      {/* 6. Authentic IE6 Status Bar */}
       <div className="bg-[#ece9d8] border-t border-[#d4d0c8] px-2 py-0.5 flex items-center justify-between text-[10px] text-gray-600 select-none">
         <div className="flex items-center gap-1.5 truncate max-w-[70%]">
           <Globe size={11} className="text-blue-700 shrink-0" />
           <span className="truncate">{statusText}</span>
         </div>
         <div className="flex items-center gap-2">
-          <div className="border-l border-r border-[#808080] px-2 flex items-center gap-1">
+          {browserMode === 'live' && (
+            <div className="border-l border-r border-[#808080] px-2 text-[9.5px] text-green-700 font-mono font-bold">
+              ● PROXIED LIVE
+            </div>
+          )}
+          <div className="border-r border-[#808080] pr-2 flex items-center gap-1">
             <Lock size={10} className="text-gray-500" />
             <span>Internet (Zone 1)</span>
           </div>
