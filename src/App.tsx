@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Analytics } from '@vercel/analytics/react';
 import { WindowInstance, AppId, StickyNote, FileItem } from './types';
 import { CrtEffects } from './components/CrtEffects';
 import { Taskbar } from './components/Taskbar';
@@ -611,6 +612,7 @@ export default function App() {
           />
         )}
       </div>
+      <Analytics />
     </PlaylistProvider>
   );
 }
